@@ -1,6 +1,0 @@
-1_demanda: OPTIMAL 1397156000072
-2a_contrato_short: FEASIBLE 280324
-2b_contrato_min: SKIPPED None
-2c_turnos_cortos: SKIPPED None
-3_resto: OPTIMAL 90866000
-usada: etapa3_final None

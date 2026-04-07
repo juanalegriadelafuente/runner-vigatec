@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/app/solver_core/solve.py", line 11, in <module>
-    from ortools.sat.python import cp_model
-ModuleNotFoundError: No module named 'ortools'

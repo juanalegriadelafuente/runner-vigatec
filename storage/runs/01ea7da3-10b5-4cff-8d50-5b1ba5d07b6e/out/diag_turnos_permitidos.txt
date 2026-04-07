@@ -1,1 +1,0 @@
-[DIAG] Empleados*Días: 420, con turnos trabajo: 316, solo LIBRE: 104 (24.8%)

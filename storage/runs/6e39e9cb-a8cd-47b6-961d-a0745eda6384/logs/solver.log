@@ -1,9 +1,0 @@
-Traceback (most recent call last):
-  File "/app/solver_core/solve.py", line 3695, in <module>
-    main()
-  File "/app/solver_core/solve.py", line 3690, in main
-    plan, brechas, contrato = solve_case(dfs, out_dir)
-                              ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/solver_core/solve.py", line 1975, in solve_case
-    raise ValueError(
-ValueError: REGLA_APERTURA_CARGO HARD sin variables candidatas: ou=PERU 805 fecha=2026-02-25 dow=MIE cargo_obj=ADMINISTRADOR DE TIENDA target=07:30. Revisa PoolTurnos, RestriccionesEmpleado, Jornadas, descanso mínimo y ausentismos.
