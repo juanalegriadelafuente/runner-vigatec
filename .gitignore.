@@ -1,0 +1,7 @@
+.env
+pgdata/
+postgres_data/
+__pycache__/
+*.log
+venv/
+node_modules/
