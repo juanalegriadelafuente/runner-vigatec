@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Empresas{% endblock %}
+{% block page_title %}Empresas{% endblock %}
+{% block page_subtitle %}Crea y administra empresas del sistema{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="document.getElementById('modal-new').style.display='flex'">
+  + Nueva empresa
+</button>
+{% endblock %}
+
+{% block content %}
+
+{% if err %}<div class="alert-msg alert-err">❌ {{ err }}</div>{% endif %}
+{% if ok  %}<div class="alert-msg alert-ok" >✅ {{ ok  }}</div>{% endif %}
+
+{% if companies %}
+<div class="grid-3 mb-20">
+  {% for c in companies %}
+  <a href="{{ url_for('ui_company_detail', company_id=c.id) }}" class="company-card">
+    <div class="company-card-icon">🏢</div>
+    <div class="company-card-body">
+      <div class="company-card-name">{{ c.name }}</div>
+      <div class="company-card-meta">Creada {{ c.created_at.strftime("%d/%m/%Y") }}</div>
+    </div>
+    <div class="company-card-arrow">→</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel">
+  <div class="empty-state">
+    <div class="empty-icon">🏢</div>
+    <div class="empty-title">Sin empresas</div>
+    <div class="empty-desc">Crea la primera empresa para comenzar a configurar el sistema.</div>
+    <button class="btn btn-primary" onclick="document.getElementById('modal-new').style.display='flex'">+ Nueva empresa</button>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal nueva empresa -->
+<div id="modal-new" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nueva empresa</div>
+      <button class="modal-close" onclick="document.getElementById('modal-new').style.display='none'">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('ui_companies') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre <span class="required">*</span></label>
+          <input type="text" name="name" class="form-control" required placeholder="Ej: Tiendas MASS">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-new').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear empresa</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.company-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-sm); cursor: pointer;
+  text-decoration: none; color: inherit;
+  transition: all 0.15s;
+}
+.company-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(14,165,233,0.12); transform: translateY(-1px); }
+.company-card-icon { font-size: 28px; flex-shrink: 0; }
+.company-card-body { flex: 1; }
+.company-card-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.company-card-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.company-card-arrow { font-size: 18px; color: var(--muted); transition: color 0.15s; }
+.company-card:hover .company-card-arrow { color: var(--accent); }
+</style>
+{% endblock %}

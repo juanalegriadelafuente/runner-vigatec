@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% block title %}Demanda{% endblock %}
+{% block page_title %}Demanda{% endblock %}
+{% block page_subtitle %}Define los requerimientos por OU y tramos horarios{% endblock %}
+
+{% block content %}
+
+<style>
+  .dem-hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .dem-hero-title { font-size: 20px; font-weight: 700; color: #f8fafc; margin: 0 0 3px 0; }
+  .dem-hero-sub   { font-size: 13px; color: #94a3b8; margin: 0; }
+
+  .dem-ou-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 520px) { .dem-ou-grid { grid-template-columns: 1fr; } }
+
+  .dem-ou-card {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .dem-ou-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    background: var(--surface2, #f8fafc);
+  }
+  .dem-ou-name  { font-weight: 600; font-size: 14px; }
+  .dem-ou-meta  { font-size: 12px; color: var(--muted, #64748b); margin-top: 2px; }
+  .dem-ou-actions { display: flex; gap: 8px; align-items: center; }
+
+  .dem-table { width: 100%; border-collapse: collapse; }
+  .dem-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px;
+    color: var(--muted, #64748b); padding: 6px 12px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+  }
+  .dem-table td { padding: 8px 12px; border-bottom: 1px solid var(--border, #f1f5f9); font-size: 12px; }
+  .dem-table tr:last-child td { border-bottom: none; }
+  .dem-table tr:hover td { background: var(--surface2, #f8fafc); }
+
+  .badge-day {
+    display: inline-block;
+    background: #dbeafe; color: #1d4ed8;
+    border-radius: 4px; padding: 1px 7px;
+    font-size: 11px; font-weight: 600; font-family: monospace;
+  }
+  .badge-inactive { background: #f1f5f9; color: #94a3b8; }
+  
+  /* Estilos para las dos columnas de demanda */
+  .dem-req {
+    font-size: 16px; font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    color: var(--navy, #1e293b);
+  }
+  .dem-req-min {
+    font-size: 16px; font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    color: #b45309; /* amber-700 */
+  }
+  .dem-req-ideal {
+    font-size: 16px; font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    color: #0f766e; /* teal-700 */
+  }
+  .dem-req-ideal.sin-holgura {
+    color: var(--muted, #64748b);
+    font-weight: 400;
+  }
+  .dem-mono { font-family: monospace; font-size: 12px; color: var(--muted, #64748b); }
+
+  /* Badge de holgura */
+  .badge-holgura {
+    display: inline-block;
+    background: #ccfbf1; color: #0f766e;
+    border-radius: 4px; padding: 1px 6px;
+    font-size: 10px; font-weight: 600;
+    margin-left: 4px;
+  }
+
+  .dem-empty {
+    padding: 24px; text-align: center;
+    color: var(--muted, #64748b); font-size: 13px;
+  }
+  .dem-empty-icon { font-size: 28px; display: block; margin-bottom: 8px; }
+
+  .btn-del-sm {
+    background: none; border: 1px solid transparent;
+    border-radius: 5px; color: #ef4444; cursor: pointer;
+    padding: 2px 6px; font-size: 12px; transition: all .12s;
+  }
+  .btn-del-sm:hover { background: #fef2f2; border-color: #fecaca; }
+
+  /* Leyenda de curvas */
+  .dem-legend {
+    display: flex; gap: 16px; align-items: center;
+    font-size: 11px; color: var(--muted);
+    margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .dem-legend-item { display: flex; align-items: center; gap: 4px; }
+  .dem-legend-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+  }
+  .dem-legend-dot.min { background: #fbbf24; }
+  .dem-legend-dot.ideal { background: #14b8a6; }
+
+  /* Modal */
+  .dem-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .dem-modal {
+    background: var(--surface, #fff); border-radius: 12px;
+    padding: 24px; width: 100%; max-width: 460px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .dem-modal-title { font-weight: 700; font-size: 16px; margin: 0 0 16px 0; }
+  .dem-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .dem-form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .dem-form-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+  .dem-form-hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .dem-form-control { width: 100%; padding: 8px 10px; border: 1px solid var(--border,#e2e8f0); border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+  .dem-modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  
+  /* Separador visual entre mínimo e ideal en el form */
+  .dem-form-section {
+    background: var(--surface2, #f8fafc);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .dem-form-section-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px; letter-spacing: .3px;
+  }
+
+  /* Alertas de feedback */
+  .dem-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .dem-alert-success {
+    background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.05) 100%);
+    border: 1px solid rgba(16,185,129,0.3);
+    color: #065F46;
+  }
+  .dem-alert-error {
+    background: linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.05) 100%);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #991B1B;
+  }
+  .dem-alert-icon {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .dem-alert-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0 4px;
+  }
+  .dem-alert-close:hover { opacity: 1; }
+</style>
+
+<!-- Hero -->
+<div class="dem-hero">
+  <div>
+    <h2 class="dem-hero-title">📈 Demanda — Dos Curvas</h2>
+    <p class="dem-hero-sub">
+      <strong>Mínimo operativo</strong> (sin esto no puede operar) · 
+      <strong>Demanda real/ideal</strong> (cobertura óptima)
+    </p>
+  </div>
+</div>
+
+<!-- Mensajes de feedback -->
+{% if ok %}
+<div class="dem-alert dem-alert-success">
+  <span class="dem-alert-icon">✓</span>
+  <span>{{ ok | replace('+', ' ') }}</span>
+  <button class="dem-alert-close" onclick="this.parentElement.remove()">×</button>
+</div>
+{% endif %}
+{% if err %}
+<div class="dem-alert dem-alert-error">
+  <span class="dem-alert-icon">✕</span>
+  <span>{{ err | replace('+', ' ') }}</span>
+  <button class="dem-alert-close" onclick="this.parentElement.remove()">×</button>
+</div>
+{% endif %}
+
+<!-- Leyenda -->
+<div class="dem-legend">
+  <div class="dem-legend-item">
+    <span class="dem-legend-dot min"></span>
+    <span><strong>Mín</strong> = Mínimo operativo (restricción dura)</span>
+  </div>
+  <div class="dem-legend-item">
+    <span class="dem-legend-dot ideal"></span>
+    <span><strong>Ideal</strong> = Demanda real (objetivo blando)</span>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="filter-bar mb-16">
+  <form method="get" action="{{ url_for('ui_demanda') }}" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+    <div class="filter-group">
+      <span class="filter-label">Empresa</span>
+      <select name="company_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Elige…</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if branches %}
+    <div class="filter-group">
+      <span class="filter-label">Sucursal</span>
+      <select name="branch_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for b in branches %}
+        <option value="{{ b.id }}" {% if selected_branch_id == b.id|string %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if org_units %}
+    <div class="filter-group">
+      <span class="filter-label">OU específica</span>
+      <select name="org_unit_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todas las OUs</option>
+        {% for ou in org_units %}
+        <option value="{{ ou.id }}" {% if selected_org_unit_id == ou.id|string %}selected{% endif %}>{{ ou.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a href="{{ url_for('ui_demanda') }}" class="btn btn-ghost btn-sm">Limpiar</a>
+  </form>
+</div>
+
+{% if not selected_company_id %}
+<div class="panel">
+  <div class="empty-state">
+    <div class="empty-icon">📈</div>
+    <div class="empty-title">Selecciona una empresa</div>
+    <div class="empty-desc">Elige una empresa para ver y editar la demanda por OU.</div>
+  </div>
+</div>
+
+{% elif selected_org_unit_id %}
+<!-- ── Vista OU específica ── -->
+<div class="panel mb-16">
+  <div class="panel-header">
+    <div class="panel-title"><div class="panel-title-icon">📈</div>Tramos de demanda</div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('{{ selected_org_unit_id }}', this)">+ Agregar tramo</button>
+  </div>
+  {% if demand_rows %}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Día</th>
+          <th>Inicio</th>
+          <th>Fin</th>
+          <th style="text-align:center;">Mínimo</th>
+          <th style="text-align:center;">Ideal</th>
+          <th>Activo</th>
+          <th class="td-actions">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in demand_rows %}
+        <tr>
+          <td><span class="badge badge-blue">{{ row.dia_semana }}</span></td>
+          <td class="td-mono">{{ row.inicio }}</td>
+          <td class="td-mono">{{ row.fin }}</td>
+          <td style="text-align:center;">
+            <span class="dem-req-min">{{ row.requeridos }}</span>
+          </td>
+          <td style="text-align:center;">
+            {% if row.requeridos_ideal is not none and row.requeridos_ideal > row.requeridos %}
+              <span class="dem-req-ideal">{{ row.requeridos_ideal }}</span>
+              <span class="badge-holgura">+{{ row.requeridos_ideal - row.requeridos }}</span>
+            {% elif row.requeridos_ideal is not none %}
+              <span class="dem-req-ideal">{{ row.requeridos_ideal }}</span>
+            {% else %}
+              <span class="dem-req-ideal sin-holgura">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.active %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td class="td-actions">
+            <form method="post" action="{{ url_for('ui_demanda_delete', row_id=row.id) }}" onsubmit="return confirm('¿Eliminar?')">
+              <input type="hidden" name="org_unit_id" value="{{ selected_org_unit_id }}">
+              <input type="hidden" name="company_id"  value="{{ selected_company_id }}">
+              <input type="hidden" name="branch_id"   value="{{ selected_branch_id }}">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📈</div>
+    <div class="empty-title">Sin tramos de demanda</div>
+    <div class="empty-desc">Agrega el primer tramo horario para esta OU.</div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('{{ selected_org_unit_id }}', this)">+ Agregar tramo</button>
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<!-- ── Vista multi-OU en paralelo ── -->
+{% if ou_summary %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+  <div style="font-size:13px; color:var(--muted);">
+    {{ ou_summary|length }} unidad{% if ou_summary|length != 1 %}es{% endif %} organizativa{% if ou_summary|length != 1 %}s{% endif %}
+    · Cada una tiene su curva de demanda independiente
+  </div>
+</div>
+
+<div class="dem-ou-grid">
+  {% for item in ou_summary %}
+  <div class="dem-ou-card">
+    <div class="dem-ou-header">
+      <div>
+        <div class="dem-ou-name">{{ item.ou.name }}</div>
+        <div class="dem-ou-meta">
+          {% if item.rows_active > 0 %}
+            {{ item.rows_active }} tramo{% if item.rows_active != 1 %}s{% endif %} activo{% if item.rows_active != 1 %}s{% endif %}
+            {% if item.con_holgura > 0 %}
+              · <span style="color:#0f766e;">{{ item.con_holgura }} con holgura</span>
+            {% endif %}
+          {% else %}
+            Sin tramos definidos
+          {% endif %}
+        </div>
+      </div>
+      <div class="dem-ou-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('{{ item.ou.id }}', this)" title="Agregar tramo">+ Tramo</button>
+        <a href="{{ url_for('ui_demanda') }}?company_id={{ selected_company_id }}&branch_id={{ selected_branch_id }}&org_unit_id={{ item.ou.id }}"
+           class="btn btn-ghost btn-sm" title="Ver solo esta OU">↗</a>
+      </div>
+    </div>
+
+    {% if item.rows %}
+    <table class="dem-table">
+      <thead>
+        <tr>
+          <th>Día</th>
+          <th>Tramo</th>
+          <th style="text-align:center;">Mín</th>
+          <th style="text-align:center;">Ideal</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in item.rows %}
+        <tr>
+          <td>
+            <span class="badge-day {% if not row.active %}badge-inactive{% endif %}">{{ row.dia_semana }}</span>
+          </td>
+          <td><span class="dem-mono">{{ row.inicio[:5] }}-{{ row.fin[:5] }}</span></td>
+          <td style="text-align:center;"><span class="dem-req-min">{{ row.requeridos }}</span></td>
+          <td style="text-align:center;">
+            {% if row.requeridos_ideal is not none and row.requeridos_ideal > row.requeridos %}
+              <span class="dem-req-ideal">{{ row.requeridos_ideal }}</span>
+            {% elif row.requeridos_ideal is not none %}
+              <span class="dem-req-ideal">{{ row.requeridos_ideal }}</span>
+            {% else %}
+              <span class="dem-req-ideal sin-holgura">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('ui_demanda_delete', row_id=row.id) }}"
+                  onsubmit="return confirm('¿Eliminar este tramo?')" style="display:inline;">
+              <input type="hidden" name="org_unit_id" value="{{ item.ou.id }}">
+              <input type="hidden" name="company_id"  value="{{ selected_company_id }}">
+              <input type="hidden" name="branch_id"   value="{{ selected_branch_id }}">
+              <button type="submit" class="btn-del-sm">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="dem-empty">
+      <span class="dem-empty-icon">📭</span>
+      Sin tramos. Usa "+ Tramo" para agregar.
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="panel">
+  <div class="empty-state">
+    <div class="empty-icon">📈</div>
+    <div class="empty-title">Sin OUs disponibles</div>
+    <div class="empty-desc">Selecciona una sucursal para ver las OUs.</div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Modal agregar tramo (compartido) — ACTUALIZADO CON DOS CAMPOS -->
+<div id="dem-modal" class="dem-modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+  <div class="dem-modal">
+    <div class="dem-modal-title">➕ Nuevo tramo de demanda</div>
+    <form method="post" action="{{ url_for('ui_demanda_add') }}">
+      <input type="hidden" name="org_unit_id" id="modal-ou-id" value="">
+      
+      <!-- Día y Horarios -->
+      <div class="dem-form-row-3">
+        <div>
+          <label class="dem-form-label">Día <span style="color:#ef4444">*</span></label>
+          <select name="dia_semana" class="dem-form-control" required>
+            {% for d in dias %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="dem-form-label">Inicio <span style="color:#ef4444">*</span></label>
+          <input type="text" name="inicio" class="dem-form-control" required placeholder="08:00:00">
+        </div>
+        <div>
+          <label class="dem-form-label">Fin <span style="color:#ef4444">*</span></label>
+          <input type="text" name="fin" class="dem-form-control" required placeholder="17:00:00">
+        </div>
+      </div>
+
+      <!-- Sección: Mínimo Operativo -->
+      <div class="dem-form-section" style="border-left: 3px solid #fbbf24;">
+        <div class="dem-form-section-title">🟠 Mínimo operativo</div>
+        <div>
+          <label class="dem-form-label">Requeridos <span style="color:#ef4444">*</span></label>
+          <input type="number" name="requeridos" id="input-requeridos" class="dem-form-control" required min="0" placeholder="Ej: 2" onchange="updateIdealMin()">
+          <div class="dem-form-hint">Sin esta cantidad, la OU no puede abrir/operar</div>
+        </div>
+      </div>
+
+      <!-- Sección: Demanda Ideal -->
+      <div class="dem-form-section" style="border-left: 3px solid #14b8a6;">
+        <div class="dem-form-section-title">🟢 Demanda real / ideal (opcional)</div>
+        <div>
+          <label class="dem-form-label">Requeridos ideal</label>
+          <input type="number" name="requeridos_ideal" id="input-ideal" class="dem-form-control" min="0" placeholder="Ej: 4 (dejar vacío = sin holgura)">
+          <div class="dem-form-hint">Lo óptimo para operar bien. Debe ser ≥ mínimo.</div>
+        </div>
+      </div>
+
+      <div class="dem-modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('dem-modal').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Agregar tramo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.filter-bar { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm); }
+.filter-group { display:flex;flex-direction:column;gap:4px; }
+.filter-label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px; }
+.filter-select { padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--bg);font-family:'DM Sans',sans-serif;outline:none;min-width:130px; }
+.mb-16 { margin-bottom:16px; }
+</style>
+
+<script>
+function openModal(ouId, btn) {
+  document.getElementById('modal-ou-id').value = ouId;
+  document.getElementById('input-requeridos').value = '';
+  document.getElementById('input-ideal').value = '';
+  document.getElementById('dem-modal').style.display = 'flex';
+}
+
+function updateIdealMin() {
+  // Cuando cambia el mínimo, actualizar el min del ideal
+  var minVal = parseInt(document.getElementById('input-requeridos').value) || 0;
+  document.getElementById('input-ideal').min = minVal;
+}
+</script>
+
+{% endblock %}

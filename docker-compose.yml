@@ -1,0 +1,86 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: vigatec_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://vigatec:vigatec@db:5432/vigatec
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      STORAGE_PATH: /app/storage
+      SOLVER_CMD: python -u solver_core/solve.py
+      RESEND_API_KEY: tre_WPF9u9kY_J1JbKguuA47kvXi47KfxdAtd
+      RESEND_FROM: no-reply@dotaciones.cl
+      INTERNAL_API_TOKEN: turnera_dev_token_12345
+      API_INTERNAL_BASE_URL: http://api:8000
+      PUBLIC_BASE_URL: http://localhost:8000
+    volumes:
+      - ./storage:/app/storage
+      - ./api:/app/api
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: vigatec_worker
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DATABASE_URL: postgresql+psycopg2://vigatec:vigatec@db:5432/vigatec
+      RESEND_API_KEY: tre_WPF9u9kY_J1JbKguuA47kvXi47KfxdAtd
+      RESEND_FROM: no-reply@dotaciones.cl
+      INTERNAL_API_TOKEN: turnera_dev_token_12345
+      API_INTERNAL_BASE_URL: http://api:8000
+      STORAGE_PATH: /app/storage
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      - db
+      - redis
+      - api
+    command: celery -A worker.celery_app:celery_app worker -l info
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: vigatec_db
+    environment:
+      POSTGRES_USER: vigatec
+      POSTGRES_PASSWORD: vigatec
+      POSTGRES_DB: vigatec
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: vigatec_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: vigatec_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@vigatec.cl
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,6 @@
+1_demanda: OPTIMAL 1118084000012
+2a_contrato_short: FEASIBLE 0
+2b_contrato_min: SKIPPED None
+2c_turnos_cortos: OPTIMAL 100
+3_resto: OPTIMAL 101301000
+usada: etapa3_final None

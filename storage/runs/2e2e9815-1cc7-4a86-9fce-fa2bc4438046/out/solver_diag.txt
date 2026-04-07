@@ -1,0 +1,6 @@
+1_demanda: FEASIBLE 15833762000170
+2a_contrato_short: FEASIBLE 0
+2b_contrato_min: SKIPPED None
+2c_turnos_cortos: UNKNOWN None
+3_resto: FEASIBLE -97088000
+usada: etapa3_final None

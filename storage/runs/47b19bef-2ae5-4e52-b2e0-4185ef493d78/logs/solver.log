@@ -1,0 +1,3 @@
+
+usage: solve.py [-h] --case CASE [--out OUT]
+solve.py: error: the following arguments are required: --case

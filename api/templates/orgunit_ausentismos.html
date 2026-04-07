@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>Ausentismos</h2>
+  <p class="muted">OU: {{ org_unit.org_unit_key }} - {{ org_unit.name }}</p>
+  <p>
+    <a href="/ui/org-units/{{ org_unit.id }}">← Volver a OU</a> |
+    <a href="/ui/org-units/{{ org_unit.id }}/restricciones">Restricciones</a>
+  </p>
+</div>
+
+<div class="card">
+  <h3>Agregar ausentismo</h3>
+  <form method="post" action="/ui/org-units/{{ org_unit.id }}/ausentismos">
+    <label>Empleado</label>
+    <select name="employee_id" required>
+      {% for e in employees %}
+        <option value="{{ e.employee_key }}">{{ e.employee_key }} — {{ e.nombre }}</option>
+      {% endfor %}
+    </select>
+
+    <div class="row">
+      <div class="col">
+        <label>Fecha inicio (YYYY-MM-DD)</label>
+        <input name="fecha_inicio" placeholder="2026-03-10" required>
+      </div>
+      <div class="col">
+        <label>Fecha fin (YYYY-MM-DD)</label>
+        <input name="fecha_fin" placeholder="2026-03-12">
+      </div>
+    </div>
+
+    <label>Código ausentismo (controlado)</label>
+    <select name="ausentismo" required>
+      {% for a in aus_codes %}
+        <option value="{{ a.value }}">{{ a.value }}{% if a.label %} — {{ a.label }}{% endif %}</option>
+      {% endfor %}
+    </select>
+
+    <label>Detalle</label>
+    <input name="detalle" placeholder="Opcional">
+
+    <div class="row">
+      <div class="col">
+        <label>Hard</label>
+        <select name="hard">
+          <option value="1" selected>1</option>
+          <option value="0">0</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Penalización</label>
+        <input name="penalizacion" type="number" value="0">
+      </div>
+    </div>
+
+    <button type="submit" style="margin-top:10px;">Guardar</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Últimos ausentismos</h3>
+  <table>
+    <thead><tr><th>Empleado</th><th>Inicio</th><th>Fin</th><th>Código</th><th>Hard</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for x in items %}
+      <tr>
+        <td>{{ x.employee_id }}</td>
+        <td>{{ x.fecha_inicio }}</td>
+        <td>{{ x.fecha_fin or "" }}</td>
+        <td>{{ x.ausentismo or "" }}</td>
+        <td>{{ 1 if x.hard else 0 }}</td>
+        <td class="muted">{{ x.detalle or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,12 @@
+[DIAG] Empleados*Días: 420, con turnos trabajo: 316, solo LIBRE: 104 (24.8%)
+[v3] Dos curvas activas: 1112 slots con holgura (ideal > mínimo)
+[v3] Etapa 1 - Cobertura mínimo: 12 slots con déficit | Cobertura ideal: 292 slots bajo ideal
+[COLACIONES] Detectados 242 turnos con colación definida
+[COLACIONES] Iniciando asignación inteligente...
+[COLACIONES] Dotación inicial: 784 slots con personal
+[COLACIONES] 242 turnos necesitan colación
+[COLACIONES] Resultado: 242 OK, 0 forzadas
+[COLACIONES] Diagnóstico guardado en /app/storage/runs/1208f06d-6c49-4356-974d-cea18bf79926/out/diagnostico_colaciones.csv
+[COLACIONES] ✓ Todas las colaciones respetan el mínimo operativo
+OK -> /app/storage/runs/1208f06d-6c49-4356-974d-cea18bf79926/out
+

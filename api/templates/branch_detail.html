@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <div class="section-head">
+    <div>
+      <h2 style="margin:0;">Sucursal: {{ branch.code }} — {{ branch.name }}</h2>
+      <p class="muted" style="margin:6px 0 0 0;">ID: {{ branch.id }}</p>
+    </div>
+    <div class="actions-right">
+      <a class="btn btn-ghost" href="/ui/holidays?company_id={{ company_id }}&branch_id={{ branch.id }}">
+        📅 Feriados de esta sucursal
+      </a>
+    </div>
+  </div>
+  {% if ok %}<div class="alert alert-ok">{{ ok }}</div>{% endif %}
+  {% if err %}<div class="alert alert-error">{{ err }}</div>{% endif %}
+</div>
+
+<!-- Configuración de feriados -->
+<div class="card">
+  <h3 style="margin:0 0 8px 0;">Configuración de feriados</h3>
+  <p class="muted" style="margin:0 0 16px 0;">
+    Define si esta sucursal opera en días feriados. Esto afecta cómo el solver maneja la demanda esos días.
+  </p>
+
+  <form method="post" action="/ui/branches/{{ branch.id }}/settings">
+    <input type="hidden" name="company_id" value="{{ company_id }}">
+
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; max-width:520px;">
+      <input type="checkbox" name="opera_en_feriados" value="1"
+             {% if branch.opera_en_feriados %}checked{% endif %}
+             style="width:18px; height:18px; margin-top:2px; flex-shrink:0;">
+      <div>
+        <div style="font-weight:600;">Opera en feriados</div>
+        <div class="muted" style="font-size:13px; margin-top:2px;">
+          Si está marcado: la demanda se mantiene normal en días feriados y el solver puede asignar turnos trabajados.<br>
+          Si no está marcado: la demanda baja a 0 en feriados (nadie trabaja).
+        </div>
+      </div>
+    </label>
+
+    <div style="margin-top:16px;">
+      <button class="btn" type="submit">Guardar configuración</button>
+    </div>
+  </form>
+</div>
+
+<!-- Crear OU -->
+<div class="card">
+  <h3 style="margin:0 0 8px 0;">Crear Unidad Organizativa (OU)</h3>
+  <p class="muted" style="margin:0 0 12px 0;">La demanda se configura a nivel de OU.</p>
+  <form method="post" action="/ui/branches/{{ branch.id }}/org-units">
+    <div class="row" style="gap:12px; align-items:flex-end;">
+      <div class="col">
+        <label>org_unit_key (lo que usa el solver)</label>
+        <input name="org_unit_key" placeholder="Ej: OU_001" required/>
+      </div>
+      <div class="col">
+        <label>Nombre</label>
+        <input name="name" placeholder="Ej: Cocina Principal" required/>
+      </div>
+      <div>
+        <button class="btn" type="submit">Crear</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Lista OUs -->
+<div class="card">
+  <h3 style="margin:0 0 12px 0;">Unidades Organizativas</h3>
+  {% if org_units %}
+  <table>
+    <thead>
+      <tr>
+        <th>org_unit_key</th>
+        <th>Nombre</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ou in org_units %}
+      <tr>
+        <td>{{ ou.org_unit_key }}</td>
+        <td>{{ ou.name }}</td>
+        <td><a href="/ui/org-units/{{ ou.id }}">Abrir →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">No hay unidades organizativas aún.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

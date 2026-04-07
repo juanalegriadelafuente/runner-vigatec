@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Pool de Turnos{% endblock %}
+{% block page_title %}Pool de Turnos{% endblock %}
+{% block page_subtitle %}Define qué turnos puede usar el solver por OU + Cargo + Día{% endblock %}
+
+{% block topbar_actions %}
+{% if selected_org_unit_id %}
+<button class="btn btn-primary" onclick="document.getElementById('modal-new').style.display='flex'">+ Agregar al pool</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if err %}<div class="alert-msg alert-err mb-16">❌ {{ err }}</div>{% endif %}
+
+<div class="filter-bar mb-16">
+  <form method="get" action="{{ url_for('ui_pool') }}" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+    <div class="filter-group">
+      <span class="filter-label">Empresa</span>
+      <select name="company_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Elige…</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if branches %}
+    <div class="filter-group">
+      <span class="filter-label">Sucursal</span>
+      <select name="branch_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for b in branches %}
+        <option value="{{ b.id }}" {% if selected_branch_id == b.id|string %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if org_units %}
+    <div class="filter-group">
+      <span class="filter-label">OU</span>
+      <select name="org_unit_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Seleccionar OU…</option>
+        {% for ou in org_units %}
+        <option value="{{ ou.id }}" {% if selected_org_unit_id == ou.id|string %}selected{% endif %}>{{ ou.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if cargo_options %}
+    <div class="filter-group">
+      <span class="filter-label">Cargo</span>
+      <select name="cargo_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for c in cargo_options %}
+        <option value="{{ c }}" {% if cargo_id == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a href="{{ url_for('ui_pool') }}" class="btn btn-ghost btn-sm">Limpiar</a>
+  </form>
+</div>
+
+{% if not selected_org_unit_id %}
+<div class="panel">
+  <div class="empty-state">
+    <div class="empty-icon">🗂</div>
+    <div class="empty-title">Selecciona una OU</div>
+    <div class="empty-desc">Elige una empresa y una OU para ver y editar el pool de turnos.</div>
+  </div>
+</div>
+{% else %}
+
+<!-- Pool agrupado por cargo y día -->
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-title"><div class="panel-title-icon">🗂</div>Pool de turnos</div>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-new').style.display='flex'">+ Agregar</button>
+  </div>
+
+  {% if pool_rows %}
+  {% set dias_order = ['LUN','MAR','MIE','JUE','VIE','SAB','DOM'] %}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Cargo</th>
+          <th>Día</th>
+          <th>Turno</th>
+          <th>Habilitado</th>
+          <th class="td-actions">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in pool_rows %}
+        <tr>
+          <td><span class="badge badge-blue">{{ row.cargo_id }}</span></td>
+          <td><span class="badge badge-gray">{{ row.dia_semana }}</span></td>
+          <td class="td-mono">{{ row.shift_id }}</td>
+          <td>
+            {% if row.habilitado %}
+              <span class="badge badge-green">Sí</span>
+            {% else %}
+              <span class="badge badge-gray">No</span>
+            {% endif %}
+          </td>
+          <td class="td-actions">
+            <form method="post" action="{{ url_for('ui_pool_delete', row_id=row.id) }}" onsubmit="return confirm('¿Eliminar?')">
+              <input type="hidden" name="org_unit_id" value="{{ selected_org_unit_id }}">
+              <input type="hidden" name="company_id"  value="{{ selected_company_id }}">
+              <input type="hidden" name="branch_id"   value="{{ selected_branch_id }}">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🗂</div>
+    <div class="empty-title">Pool vacío</div>
+    <div class="empty-desc">Agrega turnos al pool para que el solver los pueda usar.</div>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-new').style.display='flex'">+ Agregar turno</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal nuevo turno -->
+<div id="modal-new" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title">Agregar al pool</div>
+      <button class="modal-close" onclick="document.getElementById('modal-new').style.display='none'">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('ui_pool_add') }}">
+      <input type="hidden" name="org_unit_id" value="{{ selected_org_unit_id }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cargo <span class="required">*</span></label>
+            <input type="text" name="cargo_id" class="form-control" required placeholder="Ej: Operador">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Día <span class="required">*</span></label>
+            <select name="dia_semana" class="form-control" required>
+              {% for d in dias %}
+              <option value="{{ d }}">{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Turno <span class="required">*</span></label>
+          <select name="shift_id" class="form-control" required>
+            {% for s in shift_ids %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Habilitado</label>
+          <select name="habilitado" class="form-control">
+            <option value="1">Sí</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-new').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Agregar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm);}
+.filter-group{display:flex;flex-direction:column;gap:4px;}
+.filter-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.filter-select{padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--bg);font-family:'DM Sans',sans-serif;outline:none;min-width:130px;}
+.mb-16{margin-bottom:16px;}
+</style>
+{% endblock %}

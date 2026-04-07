@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/app/solver_core/solve.py", line 3676, in <module>
+    main()
+  File "/app/solver_core/solve.py", line 3671, in main
+    plan, brechas, contrato = solve_case(dfs, out_dir)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/solver_core/solve.py", line 2333, in solve_case
+    raise RuntimeError(f"CP-SAT no encontró solución factible (etapa 1: demanda). Status={_status_name(status1)}")
+RuntimeError: CP-SAT no encontró solución factible (etapa 1: demanda). Status=INFEASIBLE

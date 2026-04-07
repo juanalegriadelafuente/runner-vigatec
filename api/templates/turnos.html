@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Pedir turnos</h2>
+  <p class="muted">Genera el <b>case.xlsx</b> desde BD + template del solver y ejecuta el motor.</p>
+
+  {% if err %}
+    <div class="alert alert-error">{{ err }}</div>
+  {% endif %}
+
+  <form method="get" action="/ui/turnos" style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Fila 1: Empresa -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="col" style="min-width:220px;max-width:320px;">
+        <label>Empresa <span style="color:var(--red)">*</span></label>
+        <select name="company_id" onchange="this.form.submit()" required>
+          <option value="">Seleccionar empresa…</option>
+          {% for c in companies %}
+          <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Sucursal (aparece si hay empresa) -->
+      {% if branches %}
+      <div class="col" style="min-width:200px;max-width:280px;">
+        <label>Sucursal <span style="color:var(--muted);font-size:11px;">(opcional)</span></label>
+        <select name="branch_id" onchange="this.form.submit()">
+          <option value="">Todas las sucursales</option>
+          {% for b in branches %}
+          <option value="{{ b.id }}" {% if selected_branch_id == b.id|string %}selected{% endif %}>
+            {{ b.name or b.code }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- OU (aparece si hay sucursal) -->
+      {% if org_units %}
+      <div class="col" style="min-width:200px;max-width:280px;">
+        <label>Unidad Organizativa <span style="color:var(--muted);font-size:11px;">(opcional)</span></label>
+        <select name="org_unit_id">
+          <option value="">Todas las UOs</option>
+          {% for ou in org_units %}
+          <option value="{{ ou.id }}">{{ ou.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Indicador de scope activo -->
+    {% if selected_company_id %}
+    <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+      <span>📍 Scope:</span>
+      <span style="font-weight:600;color:var(--text);">
+        {% for c in companies %}{% if selected_company_id == c.id|string %}{{ c.name }}{% endif %}{% endfor %}
+        {% if selected_branch_id %}
+          → {% for b in branches %}{% if selected_branch_id == b.id|string %}{{ b.name or b.code }}{% endif %}{% endfor %}
+        {% else %}
+          <span style="color:var(--muted);font-weight:400;"> (todas las sucursales)</span>
+        {% endif %}
+      </span>
+    </div>
+    {% endif %}
+
+  </form>
+
+  <!-- Formulario de ejecución (solo si hay empresa seleccionada) -->
+  {% if selected_company_id %}
+  <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+
+  <form method="post" action="/ui/turnos/request" class="row" style="align-items:flex-end;gap:12px;">
+    <input type="hidden" name="company_id"   value="{{ selected_company_id }}">
+    <input type="hidden" name="branch_id"    value="{{ selected_branch_id }}">
+    <input type="hidden" name="org_unit_id"  value="">  {# se llena por JS si hay OU seleccionada #}
+
+    <div class="col" style="min-width:200px;max-width:280px;">
+      <label>Mes (YYYY-MM)</label>
+      <input name="month" value="{{ default_month }}" required>
+    </div>
+
+    <div>
+      <button class="btn btn-primary" type="submit">🚀 Pedir turnos</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="muted" style="margin-top:8px;">Selecciona una empresa para continuar.</p>
+  {% endif %}
+
+</div>
+
+<script>
+  // Sincronizar org_unit_id al form de submit
+  (function() {
+    const ouSelect = document.querySelector('select[name="org_unit_id"]');
+    const ouHidden = document.querySelector('input[type="hidden"][name="org_unit_id"]');
+    if (ouSelect && ouHidden) {
+      ouSelect.addEventListener('change', () => { ouHidden.value = ouSelect.value; });
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ user.full_name }}{% endblock %}
+{% block page_title %}Usuario{% endblock %}
+{% block page_subtitle %}{{ user.email }} · {{ user.role }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="/ui/system/users" class="btn btn-ghost btn-sm">← Volver</a>
+<form method="post" action="/ui/system/users/{{ user.id }}/impersonate" style="display:inline;">
+  <button class="btn btn-primary btn-sm" type="submit">👤 Impersonar</button>
+</form>
+{% endblock %}
+
+{% block content %}
+
+{% if err %}<div class="alert-msg alert-err mb-16">❌ {{ err }}</div>{% endif %}
+
+<!-- Header usuario -->
+<div class="panel mb-16">
+  <div class="panel-body" style="display:flex;align-items:center;gap:16px;">
+    <div style="width:48px;height:48px;border-radius:50%;background:var(--accent-soft);color:#0284C7;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;">
+      {{ user.full_name[:2].upper() }}
+    </div>
+    <div>
+      <div style="font-size:17px;font-weight:700;color:var(--text);">{{ user.full_name }}</div>
+      <div style="font-size:13px;color:var(--muted);">{{ user.email }}</div>
+    </div>
+    <div style="margin-left:auto;">
+      {% if user.role == 'SUPER' %}
+        <span class="badge badge-purple">{{ user.role }}</span>
+      {% elif user.role == 'COMPANY_ADMIN' %}
+        <span class="badge badge-blue">{{ user.role }}</span>
+      {% else %}
+        <span class="badge badge-gray">{{ user.role }}</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Rol y permisos -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-icon">🔑</div>Rol y permisos</div>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/ui/system/users/{{ user.id }}/update">
+        <div class="form-group">
+          <label class="form-label">Rol</label>
+          <select name="role" class="form-control" required>
+            {% for r in ["SUPER","COMPANY_ADMIN","ZONAL_ADMIN","BRANCH_ADMIN","COLLABORATOR"] %}
+            <option value="{{ r }}" {% if user.role==r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-title mb-16">Permisos específicos</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          {% for perm, label in [
+            ('can_manage_catalogs','Catálogos'),
+            ('can_manage_companies','Empresas'),
+            ('can_edit_employees','Colaboradores'),
+            ('can_edit_demand','Demanda'),
+            ('can_edit_pool','Pool'),
+            ('can_edit_restrictions','Restricciones'),
+            ('can_edit_absences','Ausentismos'),
+            ('can_request_turnos','Pedir turnos'),
+            ('can_edit_turnos','Editar turnos'),
+            ('can_view_all_runs','Ver todos los runs'),
+          ] %}
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 0;">
+            <input type="checkbox" name="{{ perm }}" {% if user[perm] %}checked{% endif %}>
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="divider"></div>
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scopes -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-icon">🎯</div>Scopes (alcance)</div>
+    </div>
+    <div class="panel-body">
+      <p class="text-muted text-sm mb-16">Asigna empresa/sucursal/OU según rol. Puedes agregar múltiples scopes.</p>
+
+      <form method="post" action="/ui/system/users/{{ user.id }}/scopes">
+        <div class="form-group">
+          <label class="form-label">Empresa</label>
+          <select name="company_id" class="form-control">
+            <option value="">(vacío)</option>
+            {% for c in companies %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sucursal</label>
+          <select name="branch_id" class="form-control">
+            <option value="">(vacío)</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.code }} — {{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">OU</label>
+          <select name="org_unit_id" class="form-control">
+            <option value="">(vacío)</option>
+            {% for ou in org_units %}
+            <option value="{{ ou.id }}">{{ ou.org_unit_key }} — {{ ou.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" type="submit">+ Agregar scope</button>
+      </form>
+
+      <div class="divider"></div>
+
+      {% if scopes %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Empresa</th><th>Sucursal</th><th>OU</th><th></th></tr></thead>
+          <tbody>
+            {% for s in scopes %}
+            <tr>
+              <td class="td-muted" style="font-size:11px;">{{ s.company_id or '—' }}</td>
+              <td class="td-muted" style="font-size:11px;">{{ s.branch_id or '—' }}</td>
+              <td class="td-muted" style="font-size:11px;">{{ s.org_unit_id or '—' }}</td>
+              <td class="td-actions">
+                <form method="post" action="/ui/system/users/{{ user.id }}/scopes/{{ s.id }}/delete">
+                  <button class="btn btn-danger btn-sm" type="submit">Quitar</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Sin scopes asignados.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<style>.mb-16{margin-bottom:16px;}</style>
+{% endblock %}
