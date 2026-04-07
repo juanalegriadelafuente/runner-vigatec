@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Publicar Turnos{% endblock %}
+{% block page_title %}Publicar Turnos{% endblock %}
+{% block page_subtitle %}Envía el PDF mensual a cada colaborador por email{% endblock %}
+
+{% block content %}
+
+{% if err %}<div class="alert-msg alert-err mb-16">❌ {{ err }}</div>{% endif %}
+{% if ok  %}<div class="alert-msg alert-ok  mb-16">✅ {{ ok  }}</div>{% endif %}
+
+<div class="grid-2-1">
+
+  <!-- Formulario -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-icon">📤</div>Configurar publicación</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- Paso 1: Elegir empresa (GET para recargar) -->
+      <div class="form-group">
+        <label class="form-label">Empresa</label>
+        <form method="get" action="{{ url_for('ui_publish') }}" style="display:flex;gap:8px;">
+          <select name="company_id" class="form-control" onchange="this.form.submit()">
+            <option value="">Seleccionar empresa…</option>
+            {% for c in companies %}
+            <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+
+      {% if runs %}
+      <div class="divider"></div>
+
+      <!-- Paso 2: Publicar (POST) -->
+      <form method="post" action="{{ url_for('ui_publish_create') }}">
+        <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+
+        <div class="form-group">
+          <label class="form-label">Run <span class="required">*</span></label>
+          <select name="run_id" class="form-control" required>
+            <option value="">Elige run…</option>
+            {% for r in runs %}
+            <option value="{{ r.id }}" {% if selected_run_id == r.id|string %}selected{% endif %}>
+              {{ r.created_at.strftime("%Y-%m-%d %H:%M") }} — {{ r.original_filename }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Mes <span class="required">*</span></label>
+          <input type="month" name="month" class="form-control" value="{{ month }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unidad Organizativa <span class="required">*</span></label>
+          <select name="org_unit_id" class="form-control" required>
+            <option value="">Elige OU…</option>
+            {% for ou in org_units %}
+            <option value="{{ ou.id }}" {% if selected_org_unit_id == ou.id|string %}selected{% endif %}>{{ ou.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Modo de envío</label>
+          <select name="mode" class="form-control">
+            <option value="all"  {% if mode == 'all'  %}selected{% endif %}>Enviar a todos (OU)</option>
+            <option value="test" {% if mode == 'test' %}selected{% endif %}>Prueba (un correo)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Correo de prueba</label>
+          <input type="email" name="test_email" class="form-control" value="{{ test_email }}" placeholder="tu@correo.com">
+          <div class="form-hint">Obligatorio si modo = Prueba.</div>
+        </div>
+
+        {% if preview_count > 0 %}
+        <div class="alert-msg" style="background:var(--accent-soft);color:#0369A1;border:1px solid #BAE6FD;margin-bottom:16px;font-size:12.5px;">
+          📧 Se enviarán <strong>{{ preview_count }}</strong> emails.
+          {% if missing_email_count > 0 %}
+          <span style="color:var(--amber);"> · {{ missing_email_count }} sin email (se saltarán).</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-secondary w-full" style="justify-content:center;">
+          📤 Publicar turnos
+        </button>
+      </form>
+
+      {% else %}
+      <div class="empty-state" style="padding:24px 0;">
+        <div class="empty-icon">📤</div>
+        <div class="empty-title">Selecciona una empresa</div>
+        <div class="empty-desc">Elige una empresa para ver los runs disponibles.</div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- Publicaciones recientes -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-icon" style="background:var(--green-soft)">📋</div>Publicaciones recientes</div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      {% if recent_publications %}
+        {% for pub in recent_publications %}
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="font-medium">{{ pub.org_unit_id or '—' }}</span>
+            <span class="badge {% if pub.status == 'queued' %}badge-amber{% elif pub.status == 'sent' %}badge-green{% else %}badge-red{% endif %}">
+              {{ pub.status }}
+            </span>
+          </div>
+          <div class="td-muted">
+            {{ pub.month or '—' }} ·
+            {{ pub.created_at.strftime("%d/%m %H:%M") if pub.created_at else '—' }}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" style="padding:24px;">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">Sin publicaciones</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<style>.mb-16{margin-bottom:16px;}.w-full{width:100%;}</style>
+{% endblock %}

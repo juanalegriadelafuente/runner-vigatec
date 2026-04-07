@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>OU: {{ org_unit.org_unit_key }} - {{ org_unit.name }}</h2>
+  <p class="muted">OU ID: {{ org_unit.id }} — Sucursal: {{ branch.code }} - {{ branch.name }}</p>
+  <p class="muted">Colaboradores en esta OU: <b>{{ emp_count }}</b></p>
+</div>
+
+<div class="card">
+  <h3>Ir a operación (filtrado por esta OU)</h3>
+  <div class="row" style="flex-wrap:wrap;">
+    <a class="btn btn-ghost" href="/ui/colaboradores?company_id={{company_id}}&branch_id={{branch.id}}&org_unit_id={{org_unit.id}}">Colaboradores</a>
+    <a class="btn btn-ghost" href="/ui/demanda?company_id={{company_id}}&branch_id={{branch.id}}&org_unit_id={{org_unit.id}}">Demanda</a>
+    <a class="btn btn-ghost" href="/ui/pool?company_id={{company_id}}&branch_id={{branch.id}}&org_unit_id={{org_unit.id}}">Pool</a>
+    <a class="btn btn-ghost" href="/ui/restricciones?company_id={{company_id}}&branch_id={{branch.id}}&org_unit_id={{org_unit.id}}">Restricciones</a>
+    <a class="btn btn-ghost" href="/ui/ausentismos?company_id={{company_id}}&branch_id={{branch.id}}&org_unit_id={{org_unit.id}}">Ausentismos</a>
+  </div>
+</div>
+{% endblock %}

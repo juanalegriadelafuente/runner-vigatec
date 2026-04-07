@@ -1,0 +1,5 @@
+shift_id,turno_display,inicio,fin,colacion_min
+LIBRE,LIBRE,,,
+LM,LM,,,
+S_0730_1730_60,07:30–17:30,07:30,17:30,60.0
+S_1130_2130_60,11:30–21:30,11:30,21:30,60.0

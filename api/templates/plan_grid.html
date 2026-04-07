@@ -1,0 +1,1505 @@
+{% extends "base.html" %}
+
+{% block title %}Visualizar / Editar Turnos{% endblock %}
+{% block page_title %}Visualizar / Editar Turnos{% endblock %}
+{% block page_subtitle %}
+  {% if run %}
+    Semana del {{ week_start }} · {{ grid_rows | length }} colaboradores
+    {% if selected_branch_id %}
+      · {% for b in plan_branches %}{% if b.id|string == selected_branch_id %}{{ b.name or b.code }}{% endif %}{% endfor %}
+    {% endif %}
+    {% if selected_org_unit_id %}
+      / {% for ou in plan_org_units %}{% if ou.id|string == selected_org_unit_id %}{{ ou.name }}{% endif %}{% endfor %}
+    {% endif %}
+  {% endif %}
+{% endblock %}
+
+{% block head %}
+<style>
+  /* ── FILTROS ── */
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .filter-bar select, .filter-bar input[type="text"] {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    min-width: 160px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus {
+    border-color: var(--accent);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+  }
+
+  /* ── WEEK NAV ── */
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .week-nav-btn {
+    width: 32px; height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer;
+    text-decoration: none;
+    transition: all 0.12s;
+  }
+  .week-nav-btn:hover { background: var(--navy); color: white; border-color: var(--navy); }
+  .week-nav-btn.disabled { opacity: 0.3; pointer-events: none; }
+  .week-label {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    padding: 0 8px;
+  }
+  .week-select {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    color: var(--text);
+    background: var(--surface);
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+  }
+
+  /* ── CHANGES BAR ── */
+  .changes-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--amber-soft);
+    border: 1px solid #FDE68A;
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #92400E;
+    display: none;
+  }
+  .changes-bar.visible { display: flex; }
+  .changes-count {
+    background: var(--amber);
+    color: white;
+    border-radius: 20px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ── GRID ── */
+  .grid-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  /* Header */
+  .grid-table thead tr {
+    background: var(--navy);
+  }
+  .grid-table thead th {
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    text-align: left;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border-right: 1px solid rgba(255,255,255,0.08);
+  }
+  .grid-table thead th:last-child { border-right: none; }
+  .grid-table thead th.day-col { text-align: center; min-width: 130px; }
+  .th-date { font-size: 10px; color: rgba(255,255,255,0.4); display: block; margin-top: 1px; font-weight: 400; }
+  .th-today { color: #7DD3FC !important; }
+  .th-date-today { color: rgba(125,211,252,0.7) !important; }
+
+  /* Rows */
+  .grid-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .grid-table tbody tr:last-child { border-bottom: none; }
+  .grid-table tbody tr:hover { background: #F8FAFC; }
+
+  .grid-table tbody td {
+    padding: 8px 12px;
+    vertical-align: middle;
+    border-right: 1px solid var(--border);
+  }
+  .grid-table tbody td:last-child { border-right: none; }
+
+  /* ── Celda colaborador estilo Quinyx ── */
+  .emp-cell   { display:flex; align-items:center; gap:9px; min-width:210px; }
+  .emp-avatar { width:32px; height:32px; border-radius:50%; background:#0D2240; color:#7DD3FC; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
+  .emp-info   { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+  .emp-name   { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .emp-meta   { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); white-space:nowrap; }
+  .emp-hrs    { font-family:'DM Mono',monospace; font-size:10.5px; font-weight:600; }
+  .emp-hrs.ok    { color:#059669; }
+  .emp-hrs.under { color:#D97706; }
+  .emp-hrs.over  { color:#DC2626; }
+  .emp-hrs.none  { color:var(--muted); }
+  .hrs-bar  { width:100%; height:3px; background:var(--border); border-radius:2px; margin-top:4px; overflow:hidden; }
+  .hrs-fill { height:100%; border-radius:2px; transition:width .25s ease; background:var(--border); }
+  .hrs-fill.ok    { background:#10B981; }
+  .hrs-fill.under { background:#F59E0B; }
+  .hrs-fill.over  { background:#EF4444; }
+
+  /* ── Panel de curvas de demanda ── */
+  .demand-panel  { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); margin-top:12px; overflow:hidden; }
+  .demand-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--navy); border-bottom:1px solid rgba(255,255,255,0.1); }
+  .demand-title  { font-size:12px; font-weight:600; color:rgba(255,255,255,0.85); }
+  .demand-legend { display:flex; gap:14px; }
+  .demand-legend-item { display:flex; align-items:center; gap:5px; font-size:10.5px; color:rgba(255,255,255,0.6); }
+  .demand-legend-box  { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .demand-legend-line { width:16px; height:0; border-top:2px solid; flex-shrink:0; }
+  .demand-legend-dash { width:16px; height:0; border-top:2px dashed; flex-shrink:0; }
+  /* 7 columnas alineadas con la grilla */
+  .demand-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); }
+  .demand-day  { border-right:1px solid var(--border); padding:8px 6px 0; }
+  .demand-day:last-child { border-right:none; }
+  .demand-day.today { background:rgba(14,165,233,0.04); }
+  .demand-day-label { font-size:10px; font-weight:600; color:var(--muted); text-align:center; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.3px; }
+  .demand-day-label.today { color:#0EA5E9; }
+  .demand-chart-box { position:relative; width:100%; height:90px; margin-bottom:4px; }
+  .demand-empty { font-size:10px; color:var(--muted); text-align:center; padding:16px 0; font-style:italic; }
+
+  /* Shift cell */
+  .shift-cell { text-align: center; padding: 6px 8px !important; }
+
+  .shift-select {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    transition: all 0.12s;
+    text-align: center;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .shift-select:hover { border-color: var(--accent); background: white; }
+  .shift-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(14,165,233,0.15); background: white; }
+  .shift-select.changed { border-color: var(--amber) !important; background: #FFFBEB !important; color: #92400E; }
+  .shift-select.is-libre { color: var(--muted); font-style: italic; }
+  .shift-select.is-aus   { border-color: #FECACA; background: #FFF5F5; color: var(--red); }
+  .shift-select.is-override { border-color: var(--amber); background: #FFFBEB; }
+  .shift-select.is-override.state-pending  { border-color: #f59e0b; background: #fffbeb; }
+  .shift-select.is-override.state-accepted { border-color: #22c55e; background: #f0fdf4; }
+  .shift-select.is-override.state-rejected { border-color: #ef4444; background: #fef2f2; }
+  .override-badge {
+    display: block; font-size: 9px; text-align: center;
+    border-radius: 3px; padding: 1px 3px; margin-top: 2px; font-weight: 600;
+  }
+  .override-badge.pending  { background:#fef3c7; color:#b45309; }
+  .override-badge.accepted { background:#dcfce7; color:#166534; }
+  .override-badge.rejected { background:#fee2e2; color:#991b1b; }
+
+  /* Today column highlight */
+  .col-today { background: rgba(14,165,233,0.04); }
+
+  /* ── Selector de vista ── */
+  .view-switcher { display:flex; gap:3px; margin-left:14px; align-items:center; }
+  .view-btn { padding:4px 12px; font-size:12px; font-weight:500; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.2); background:transparent; color:rgba(255,255,255,0.6); cursor:pointer; text-decoration:none; transition:all .12s; }
+  .view-btn.active { background:rgba(255,255,255,0.15); color:white; border-color:rgba(255,255,255,0.35); }
+  .view-btn:hover:not(.active) { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.85); }
+
+  /* ── Fechas de columna clicables ── */
+  .day-col-link { display:block; text-decoration:none; color:inherit; border-radius:4px; padding:2px 4px; margin:-2px -4px; transition:background .1s; cursor:pointer; }
+  .day-col-link:hover { background:rgba(255,255,255,0.12); }
+
+  /* ── Agrupación por cargo ── */
+  .cargo-group-header td { padding:6px 14px; font-size:10px; font-weight:700; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.6px; background:var(--navy); border-top:2px solid rgba(255,255,255,0.1); }
+  .cargo-group-header:first-child td { border-top:none; }
+
+  /* ── Contadores por cargo ── */
+  .cargo-counters { display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px; background:#F8FAFC; border-top:2px solid var(--border); }
+  .cargo-counter-chip { display:flex; align-items:center; gap:6px; background:white; border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:11.5px; }
+  .cargo-counter-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .cargo-counter-name { color:var(--text); font-weight:500; }
+  .cargo-counter-num  { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; color:#0EA5E9; }
+  .cargo-counter-total{ font-size:10px; color:var(--muted); }
+
+  /* ── Separador ausentes ── */
+  .ausentes-divider td { padding:5px 14px; font-size:10.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; background:#F8FAFC; border-top:2px solid var(--border); }
+
+  /* ── Columnas sticky Hrs/Sobretiempo ── */
+  .sticky-hrs { position:sticky; right:80px; background:var(--surface); border-left:1px solid var(--border) !important; min-width:80px; text-align:center; z-index:2; }
+  .sticky-sob { position:sticky; right:0;    background:var(--surface); border-left:2px solid var(--border) !important; min-width:80px; text-align:center; z-index:2; }
+  thead .sticky-hrs, thead .sticky-sob { background:var(--navy); z-index:3; border-left-color:rgba(255,255,255,0.12) !important; }
+
+  /* ── Vista diaria ── */
+  .day-nav-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; text-decoration:none; transition:all .12s; flex-shrink:0; }
+  .day-nav-btn:hover { background:var(--navy); color:white; border-color:var(--navy); }
+  .shift-block { position:absolute; top:6px; bottom:6px; border-radius:5px; display:flex; align-items:center; padding:0 8px; font-size:10.5px; font-weight:600; white-space:nowrap; overflow:hidden; border-left:3px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .shift-block.morning   { background:#EFF6FF; color:#1D4ED8; border-color:#93C5FD; }
+  .shift-block.afternoon { background:#FFFBEB; color:#B45309; border-color:#FCD34D; }
+  .shift-block.evening   { background:#F5F3FF; color:#6D28D9; border-color:#C4B5FD; }
+  .shift-block.aus-blk   { background:#FFF5F5; color:#DC2626; border-color:#FCA5A5; }
+  
+  /* Bloque de colación - se muestra encima del turno */
+  .colacion-block {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 28px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    border: 2px dashed #F59E0B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(245,158,11,0.25);
+    z-index: 10;
+    cursor: help;
+    transition: transform 0.15s ease;
+  }
+  .colacion-block:hover {
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 4px 8px rgba(245,158,11,0.35);
+  }
+  .colacion-icon {
+    font-size: 14px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
+  }
+  .now-line { position:absolute; top:0; bottom:0; width:2px; background:#EF4444; pointer-events:none; z-index:10; display:none; }
+  .now-dot  { position:absolute; top:-5px; left:-4px; width:10px; height:10px; background:#EF4444; border-radius:50%; border:2px solid white; }
+
+  /* Empty state */
+  .grid-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--muted);
+  }
+  .grid-empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; display: block; }
+  .grid-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .grid-empty-desc  { font-size: 13px; color: var(--muted); }
+
+  /* ── ALERTS ── */
+  .alert-msg {
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-ok   { background: var(--green-soft); color: #065F46; border: 1px solid #A7F3D0; }
+  .alert-warn { background: var(--amber-soft);  color: #92400E; border: 1px solid #FDE68A; }
+  .alert-err  { background: var(--red-soft);    color: #991B1B; border: 1px solid #FECACA; }
+
+  /* ── PUBLISH BTN ── */
+  .btn-publish {
+    background: var(--red) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: 8px 18px !important;
+  }
+  .btn-publish:hover { background: #DC2626 !important; }
+  .btn-save {
+    background: var(--navy) !important;
+    color: white !important;
+  }
+  .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* ── FULLSCREEN DAY VIEW OVERLAY ── */
+  #fs-overlay {
+    position:fixed; inset:0; z-index:9999; background:var(--bg);
+    display:none; flex-direction:column; overflow:hidden;
+  }
+  #fs-overlay.open { display:flex; }
+  .fs-topbar {
+    display:flex; align-items:center; gap:10px; padding:10px 20px;
+    background:var(--navy); color:white; flex-shrink:0;
+  }
+  .fs-topbar .day-nav-btn { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.2); color:white; }
+  .fs-topbar .day-nav-btn:hover { background:rgba(255,255,255,.2); }
+  .fs-title { font-size:16px; font-weight:700; }
+  .fs-badge-today { font-size:10px; font-weight:600; background:#0BDA8B; color:#0D2240; padding:2px 8px; border-radius:100px; }
+  .fs-close { margin-left:auto; background:none; border:none; color:rgba(255,255,255,.6); font-size:22px; cursor:pointer; padding:4px 8px; border-radius:6px; }
+  .fs-close:hover { background:rgba(255,255,255,.12); color:white; }
+  .fs-chips { display:flex; gap:6px; padding:8px 20px; background:#F8FAFC; border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+  .fs-body { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+  .fs-timeline { flex:1; overflow-y:auto; overflow-x:hidden; position:relative; }
+  .fs-chart-wrap { height:180px; flex-shrink:0; border-top:2px solid var(--border); padding:8px 20px 8px 20px; background:var(--surface); }
+  /* Timeline rows */
+  .fs-row { display:grid; grid-template-columns:200px 1fr; border-bottom:1px solid var(--border); min-height:48px; }
+  .fs-row:hover { background:rgba(14,165,233,.03); }
+  .fs-cargo-hdr { grid-column:1/-1; padding:5px 14px; font-size:9.5px; font-weight:700; color:rgba(255,255,255,.5); text-transform:uppercase; letter-spacing:.5px; background:var(--navy); }
+  .fs-emp { padding:8px 12px; border-right:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+  .fs-bar-area { position:relative; overflow:hidden; }
+  .fs-grid-line { position:absolute; top:0; bottom:0; width:1px; background:var(--border); opacity:.3; }
+  .fs-shift { position:absolute; top:6px; bottom:6px; border-radius:5px; display:flex; align-items:center; padding:0 8px; font-size:10px; font-weight:600; white-space:nowrap; overflow:hidden; border-left:3px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .fs-shift.morning   { background:#EFF6FF; color:#1D4ED8; border-color:#93C5FD; }
+  .fs-shift.afternoon { background:#FFFBEB; color:#B45309; border-color:#FCD34D; }
+  .fs-shift.evening   { background:#F5F3FF; color:#6D28D9; border-color:#C4B5FD; }
+  .fs-col-block {
+    position:absolute; top:50%; transform:translateY(-50%); height:26px; border-radius:4px;
+    background:linear-gradient(135deg,#FEF3C7,#FDE68A); border:2px dashed #F59E0B;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(245,158,11,.25);
+    z-index:10; cursor:grab; font-size:13px; user-select:none; transition:box-shadow .15s;
+  }
+  .fs-col-block:hover { box-shadow:0 4px 12px rgba(245,158,11,.4); }
+  .fs-col-block.dragging { opacity:.7; cursor:grabbing; box-shadow:0 6px 16px rgba(245,158,11,.5); }
+  .fs-libre { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:10px; color:var(--muted); font-style:italic; }
+  .fs-now { position:absolute; top:0; bottom:0; width:2px; background:#EF4444; z-index:20; pointer-events:none; }
+  .fs-now-dot { position:absolute; top:-5px; left:-4px; width:10px; height:10px; background:#EF4444; border-radius:50%; border:2px solid white; }
+  @keyframes fsToastIn { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
+  .fs-time-hdr { display:grid; grid-template-columns:200px repeat(var(--th),1fr); background:var(--navy); flex-shrink:0; }
+  .fs-time-hdr>div:first-child { padding:8px 12px; font-size:10px; font-weight:600; color:rgba(255,255,255,.5); text-transform:uppercase; letter-spacing:.4px; }
+  .fs-time-hdr>div:not(:first-child) { font-size:9px; color:rgba(255,255,255,.4); padding:8px 0 8px 4px; border-left:1px solid rgba(255,255,255,.08); }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if run %}
+  <div id="changes-indicator" style="font-size:12px;color:var(--amber);font-weight:600;display:none;">
+    <span id="changes-count">0</span> cambios sin guardar
+  </div>
+  <button id="btn-discard" class="btn btn-ghost" style="display:none;" onclick="discardChanges()">Descartar</button>
+  <button id="btn-save" class="btn btn-save" disabled onclick="saveChanges()">💾 Guardar cambios</button>
+  <a href="{{ url_for('ui_publish') }}" class="btn btn-publish">📤 PUBLICAR</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Alertas -->
+{% if err %}<div class="alert-msg alert-err">❌ {{ err }}</div>{% endif %}
+{% if warn %}<div class="alert-msg alert-warn">⚠️ {{ warn }}</div>{% endif %}
+{% if ok %}<div class="alert-msg alert-ok">✅ {{ ok }}</div>{% endif %}
+
+<!-- Filtros -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">Empresa</span>
+    <select id="sel-company" onchange="applyFilters()">
+      <option value="">Seleccionar empresa…</option>
+      {% for c in companies %}
+      <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>
+        {{ c.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if plan_branches %}
+  <div class="filter-group">
+    <span class="filter-label">Sucursal</span>
+    <select id="sel-branch" onchange="applyFilters()">
+      <option value="">Todas las sucursales</option>
+      {% for b in plan_branches %}
+      <option value="{{ b.id }}" {% if selected_branch_id == b.id|string %}selected{% endif %}>
+        {{ b.name or b.code }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  {% if plan_org_units %}
+  <div class="filter-group">
+    <span class="filter-label">Unidad Organizativa</span>
+    <select id="sel-ou" onchange="applyFilters()">
+      <option value="">Todas las UOs</option>
+      {% for ou in plan_org_units %}
+      <option value="{{ ou.id }}" {% if selected_org_unit_id == ou.id|string %}selected{% endif %}>
+        {{ ou.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  {% if runs %}
+  <div class="filter-group">
+    <span class="filter-label">Run</span>
+    <select id="sel-run" onchange="applyFilters()">
+      {% for r in runs %}
+      <option value="{{ r.id }}" {% if selected_run_id == r.id|string %}selected{% endif %}>
+        {{ r.created_at.strftime("%Y-%m-%d %H:%M") }} — {{ r.original_filename }} · {{ r.status }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  <div class="filter-group">
+    <span class="filter-label">Buscar colaborador</span>
+    <input type="text" id="search-q" placeholder="Nombre o ID…"
+           value="{{ q or '' }}" onkeydown="if(event.key==='Enter') applyFilters()">
+  </div>
+
+  <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
+</div>
+
+{% if run %}
+
+<!-- Week nav -->
+<div class="week-nav">
+  <a class="week-nav-btn {% if not prev_week %}disabled{% endif %}"
+     href="?company_id={{ selected_company_id }}&run_id={{ selected_run_id }}&week_start={{ prev_week }}&q={{ q }}{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}{% if selected_org_unit_id %}&org_unit_id={{ selected_org_unit_id }}{% endif %}">‹</a>
+
+  <span class="week-label">Semana del {{ week_start }}</span>
+  <div class="view-switcher">
+    <a class="view-btn {% if q_view != 'day' %}active{% endif %}"
+       href="?company_id={{ selected_company_id }}&run_id={{ selected_run_id }}&week_start={{ week_start }}&view=week{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}{% if selected_org_unit_id %}&org_unit_id={{ selected_org_unit_id }}{% endif %}">Semana</a>
+    <a class="view-btn {% if q_view == 'day' %}active{% endif %}"
+       href="#" onclick="event.preventDefault();openDayFullscreen('{{ today_str }}')">Día</a>
+  </div>
+
+  <a class="week-nav-btn {% if not next_week %}disabled{% endif %}"
+     href="?company_id={{ selected_company_id }}&run_id={{ selected_run_id }}&week_start={{ next_week }}&q={{ q }}{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}{% if selected_org_unit_id %}&org_unit_id={{ selected_org_unit_id }}{% endif %}">›</a>
+
+  <select class="week-select" onchange="goWeek(this.value)">
+    {% for ws in week_starts %}
+    <option value="{{ ws }}" {% if ws == week_start %}selected{% endif %}>Semana {{ ws }}</option>
+    {% endfor %}
+  </select>
+
+  <span style="margin-left:8px;font-size:12px;color:var(--muted);">
+    {{ grid_rows | length }} colaboradores
+  </span>
+</div>
+
+<!-- Grid -->
+<form id="edit-form" method="post" action="{{ url_for('ui_plan_edit') }}">
+  <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+  <input type="hidden" name="run_id"     value="{{ selected_run_id }}">
+  <input type="hidden" name="week_start" value="{{ week_start }}">
+
+  <div class="grid-wrapper">
+    {% if grid_rows %}
+    <div style="overflow-x:auto;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th style="min-width:200px;">Colaborador</th>
+            {% for d in days %}
+            <th class="day-col {% if d.date == today_str %}th-today{% endif %}">
+              <a class="day-col-link"
+                 href="#" onclick="event.preventDefault();openDayFullscreen('{{ d.date }}')"
+                 title="Ver día {{ d.label }}">
+                {{ d.label }}
+                <span class="th-date {% if d.date == today_str %}th-date-today{% endif %}">{{ d.date }}</span>
+              </a>
+            </th>
+            {% endfor %}
+            <th class="sticky-hrs" style="font-size:10px;">Hrs. Trab.</th>
+            <th class="sticky-sob" style="font-size:10px;">Sobretiempo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# ── Clasificar filas ── #}
+          {%- set presentes = [] -%}
+          {%- set ausentes  = [] -%}
+          {%- for row in grid_rows -%}
+            {%- set aa = namespace(v=true) -%}
+            {%- for cell in row.cells -%}{%- if cell.shift_id not in aus_codes and cell.shift_id != 'LIBRE' -%}{%- set aa.v = false -%}{%- endif -%}{%- endfor -%}
+            {%- if aa.v -%}{%- set _ = ausentes.append(row) -%}{%- else -%}{%- set _ = presentes.append(row) -%}{%- endif -%}
+          {%- endfor -%}
+
+          {# ── Ordenar presentes por cargo y agrupar ── #}
+          {%- set current_cargo = namespace(v='__NONE__') -%}
+          {%- set cargo_colors = ['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#84CC16','#F97316'] -%}
+          {%- set cargo_idx    = namespace(v=0) -%}
+          {%- set cargo_color_map = {} -%}
+
+          {# Colectar cargos únicos en orden de aparición #}
+          {%- set cargos_vistos = [] -%}
+          {%- for row in presentes | sort(attribute='cargo_id') -%}
+            {%- if row.cargo_id not in cargos_vistos -%}{%- set _ = cargos_vistos.append(row.cargo_id) -%}{%- endif -%}
+          {%- endfor -%}
+
+          {%- for row in presentes | sort(attribute='cargo_id') %}
+          {%- if row.cargo_id != current_cargo.v %}
+          {%- set current_cargo.v = row.cargo_id %}
+          <tr class="cargo-group-header">
+            <td colspan="{{ (days | length) + 3 }}">{{ row.cargo_id or '—' }}</td>
+          </tr>
+          {%- endif %}
+          <tr>
+            {%- set t = namespace(mins=0) -%}
+            {%- if cat_minutos -%}
+              {%- for cell in row.cells -%}
+                {%- if cell.shift_id and cell.shift_id != 'LIBRE' and cell.shift_id in cat_minutos -%}
+                  {%- set t.mins = t.mins + cat_minutos[cell.shift_id] -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+            <td>
+              <div class="emp-cell">
+                <div class="emp-avatar">
+                  {% set parts = row.nombre.split() %}
+                  {% if parts | length >= 2 %}{{ parts[0][0] }}{{ parts[-1][0] }}{% else %}{{ row.nombre[:2] }}{% endif %}
+                </div>
+                <div class="emp-info">
+                  <div class="emp-name">{{ row.nombre }}</div>
+                  <div class="emp-meta">
+                    <span>{{ row.cargo_id }}</span>
+                    <span style="opacity:.35">·</span>
+                    <span class="emp-hrs none"
+                      id="hrs-{{ row.employee_id }}"
+                      data-emp="{{ row.employee_id }}"
+                      data-asig="{{ t.mins }}"
+                      data-contrato="{{ row.contrato_min_semana | default(0) }}">—</span>
+                  </div>
+                  <div class="hrs-bar">
+                    <div class="hrs-fill none" id="bar-{{ row.employee_id }}" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            {% for cell in row.cells %}
+            <td class="shift-cell {% if cell.date == today_str %}col-today{% endif %}">
+              <select
+                name="cell_{{ row.employee_id }}_{{ cell.date }}"
+                class="shift-select
+                  {% if cell.shift_id == 'LIBRE' %}is-libre{% endif %}
+                  {% if cell.shift_id in aus_codes %}is-aus{% endif %}
+                  {% if cell.is_override %}is-override{% endif %}
+                  {% if cell.is_override %}{% set _st = override_states.get(row.employee_id ~ '|' ~ cell.date, '') %}{% if _st == 'accepted' %}state-accepted{% elif _st == 'rejected' %}state-rejected{% else %}state-pending{% endif %}{% endif %}"
+                data-original="{{ cell.shift_id }}"
+                onchange="onShiftChange(this)">
+                {% for opt in shift_options %}
+                <option value="{{ opt }}" {% if opt == cell.shift_id %}selected{% endif %}>
+                  {% if shift_labels and opt in shift_labels %}{{ shift_labels[opt] }}{% else %}{{ opt }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              {% if cell.is_override %}
+                {% set _st = override_states.get(row.employee_id ~ '|' ~ cell.date, 'pending') %}
+                {% if _st == 'accepted' %}
+                  <span class="override-badge accepted">✅ Aceptado</span>
+                {% elif _st == 'rejected' %}
+                  <span class="override-badge rejected">❌ Rechazado</span>
+                {% else %}
+                  <span class="override-badge pending">⏳ Pendiente</span>
+                {% endif %}
+              {% endif %}
+            </td>
+            {% endfor %}
+            {# horas en badge — columna eliminada #}
+            {%- set ts = namespace(m=0) -%}
+            {%- if cat_minutos -%}{%- for cell in row.cells -%}{%- if cell.shift_id and cell.shift_id != 'LIBRE' and cell.shift_id in cat_minutos -%}{%- set ts.m = ts.m + cat_minutos[cell.shift_id] -%}{%- endif -%}{%- endfor -%}{%- endif -%}
+            {%- set ctr = row.contrato_min_semana | default(0) -%}
+            {%- set sob = ts.m - ctr -%}
+            <td class="sticky-hrs" style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);">
+              {% if ts.m > 0 %}{{ '%02d:%02d' % (ts.m // 60, ts.m % 60) }}{% else %}—{% endif %}
+            </td>
+            <td class="sticky-sob" style="font-size:11px;font-family:'DM Mono',monospace;">
+              {% if ctr > 0 and sob > 30 %}<span style="color:#DC2626;font-weight:600;">+{{ '%02d:%02d' % (sob // 60, sob % 60) }}</span>{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+            </td>
+          </tr>
+          {%- endfor %}
+
+          {# ── Ausentes ── #}
+          {%- if ausentes %}
+          <tr class="ausentes-divider"><td colspan="{{ (days | length) + 3 }}">— Ausentes de la semana —</td></tr>
+          {%- for row in ausentes %}
+          <tr style="opacity:0.55;">
+            <td>
+              <div class="emp-cell">
+                <div class="emp-avatar" style="background:#94A3B8;">
+                  {%- set p = row.nombre.split() -%}{% if p|length >= 2 %}{{ p[0][0] }}{{ p[-1][0] }}{% else %}{{ row.nombre[:2] }}{% endif %}
+                </div>
+                <div class="emp-info">
+                  <div class="emp-name">{{ row.nombre }}</div>
+                  <div class="emp-meta"><span>{{ row.cargo_id }}</span></div>
+                </div>
+              </div>
+            </td>
+            {% for cell in row.cells %}
+            <td class="shift-cell {% if cell.date == today_str %}col-today{% endif %}">
+              <select name="cell_{{ row.employee_id }}_{{ cell.date }}" class="shift-select is-aus" data-original="{{ cell.shift_id }}" onchange="onShiftChange(this)">
+                {% for opt in shift_options %}<option value="{{ opt }}" {% if opt == cell.shift_id %}selected{% endif %}>{% if shift_labels and opt in shift_labels %}{{ shift_labels[opt] }}{% else %}{{ opt }}{% endif %}</option>{% endfor %}
+              </select>
+            </td>
+            {% endfor %}
+            <td class="sticky-hrs" style="color:var(--muted);font-size:11px;">—</td>
+            <td class="sticky-sob" style="color:var(--muted);font-size:11px;">—</td>
+          </tr>
+          {%- endfor %}
+          {%- endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {# ── Contadores por cargo ── #}
+    {%- if presentes is defined and presentes %}
+    {%- set cargo_counts = {} -%}
+    {%- for row in presentes -%}
+      {%- set cargo = row.cargo_id or 'Sin cargo' -%}
+      {# Contar cuántos días trabaja este colaborador (no es LIBRE ni aus) #}
+      {%- set activos_dia = namespace(n=0) -%}
+      {%- for cell in row.cells -%}
+        {%- if cell.shift_id and cell.shift_id != 'LIBRE' and cell.shift_id not in aus_codes -%}
+          {%- set activos_dia.n = activos_dia.n + 1 -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {# Solo contar si trabaja al menos un día #}
+      {%- if activos_dia.n > 0 -%}
+        {%- if cargo not in cargo_counts -%}
+          {%- set _ = cargo_counts.update({cargo: 0}) -%}
+        {%- endif -%}
+        {%- set _ = cargo_counts.update({cargo: cargo_counts[cargo] + 1}) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    <div class="cargo-counters">
+      <span style="font-size:11px;font-weight:600;color:var(--muted);align-self:center;margin-right:4px;">Esta semana:</span>
+      {%- set colors = ['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#84CC16','#F97316'] -%}
+      {%- set ci = namespace(v=0) -%}
+      {%- for cargo, count in cargo_counts.items() | sort %}
+      <div class="cargo-counter-chip">
+        <div class="cargo-counter-dot" style="background:{{ colors[ci.v % colors|length] }};"></div>
+        <span class="cargo-counter-name">{{ cargo }}</span>
+        <span class="cargo-counter-num">{{ count }}</span>
+        <span class="cargo-counter-total">/ {{ presentes | selectattr('cargo_id', 'equalto', cargo) | list | length }}</span>
+      </div>
+      {%- set ci.v = ci.v + 1 -%}
+      {%- endfor %}
+    </div>
+    {%- endif %}
+
+    {% else %}
+    <div class="grid-empty">
+      <span class="grid-empty-icon">🗓</span>
+      <div class="grid-empty-title">Sin colaboradores para esta semana</div>
+      <div class="grid-empty-desc">Prueba cambiando el filtro de búsqueda o selecciona otra semana.</div>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+{# ── PANEL DE CURVAS DE DEMANDA ── #}
+{% if run and grid_rows and demand_curves and demand_curves.dias %}
+<div class="demand-panel">
+  <div class="demand-header">
+    <span class="demand-title">Cobertura vs demanda por franja horaria &nbsp;·&nbsp; semana {{ week_start }}</span>
+    <div class="demand-legend">
+      <div class="demand-legend-item">
+        <div class="demand-legend-box" style="background:rgba(55,138,221,0.8)"></div>Cubiertos
+      </div>
+      <div class="demand-legend-item">
+        <div class="demand-legend-line" style="border-color:#EF4444"></div>Mínimo
+      </div>
+      <div class="demand-legend-item">
+        <div class="demand-legend-dash" style="border-color:#10B981"></div>Ideal
+      </div>
+    </div>
+  </div>
+  <div class="demand-grid">
+    {% for dia in demand_curves.dias %}
+    <div class="demand-day {% if dia.fecha == today_str %}today{% endif %}">
+      <div class="demand-day-label {% if dia.fecha == today_str %}today{% endif %}">{{ dia.label }}</div>
+      {% if dia.tiene_demanda %}
+      <div class="demand-chart-box"><canvas id="dc-{{ loop.index0 }}"></canvas></div>
+      {% else %}
+      <div class="demand-empty">sin datos</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<script type="application/json" id="demand-curves-data">
+{{ demand_curves | tojson }}
+</script>
+{% endif %}
+
+
+{% if q_view == 'day' and run and grid_rows %}
+{%- set sel_date = q_date if q_date else today_str -%}
+{%- set SH = 6  -%}
+{%- set TH = 17 -%}
+
+{# Navegación anterior/siguiente dentro de la semana #}
+{%- set prev_d = namespace(v='') -%}
+{%- set next_d = namespace(v='') -%}
+{%- set sel_lbl = namespace(v=sel_date) -%}
+{%- for d in days -%}
+  {%- if d.date == sel_date -%}{%- set sel_lbl.v = d.label ~ ' · ' ~ sel_date -%}{%- endif -%}
+  {%- if d.date < sel_date -%}{%- set prev_d.v = d.date -%}{%- endif -%}
+  {%- if d.date > sel_date and not next_d.v -%}{%- set next_d.v = d.date -%}{%- endif -%}
+{%- endfor -%}
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;margin-top:12px;">
+
+  {# Barra nav día #}
+  <div style="display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);background:#F8FAFC;">
+    {% if prev_d.v %}<a class="day-nav-btn" href="?company_id={{ selected_company_id }}&run_id={{ selected_run_id }}&week_start={{ week_start }}&view=day&date={{ prev_d.v }}{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}{% if selected_org_unit_id %}&org_unit_id={{ selected_org_unit_id }}{% endif %}">‹</a>
+    {% else %}<span class="day-nav-btn" style="opacity:.3;cursor:default;">‹</span>{% endif %}
+    <span style="font-size:15px;font-weight:700;color:var(--text);">{{ sel_lbl.v }}</span>
+    {% if sel_date == today_str %}<span style="font-size:10px;font-weight:600;background:#0BDA8B;color:#0D2240;padding:2px 8px;border-radius:100px;">Hoy</span>{% endif %}
+    {% if next_d.v %}<a class="day-nav-btn" href="?company_id={{ selected_company_id }}&run_id={{ selected_run_id }}&week_start={{ week_start }}&view=day&date={{ next_d.v }}{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}{% if selected_org_unit_id %}&org_unit_id={{ selected_org_unit_id }}{% endif %}">›</a>
+    {% else %}<span class="day-nav-btn" style="opacity:.3;cursor:default;">›</span>{% endif %}
+    <span style="margin-left:auto;font-size:12px;color:var(--muted);">{{ grid_rows | length }} colaboradores</span>
+  </div>
+
+  {# Contadores por cargo del día seleccionado #}
+  {%- set day_counts = {} -%}
+  {%- for row in grid_rows -%}
+    {%- set cargo = row.cargo_id or 'Sin cargo' -%}
+    {%- for cell in row.cells -%}
+      {%- if cell.date == sel_date and cell.shift_id and cell.shift_id != 'LIBRE' and cell.shift_id not in aus_codes -%}
+        {%- if cargo not in day_counts -%}{%- set _ = day_counts.update({cargo: 0}) -%}{%- endif -%}
+        {%- set _ = day_counts.update({cargo: day_counts[cargo] + 1}) -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- if day_counts %}
+  <div class="cargo-counters" style="border-top:none;border-bottom:1px solid var(--border);">
+    <span style="font-size:11px;font-weight:600;color:var(--muted);align-self:center;margin-right:4px;">Trabajando hoy:</span>
+    {%- set colors = ['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#84CC16','#F97316'] -%}
+    {%- set ci = namespace(v=0) -%}
+    {%- for cargo, count in day_counts.items() | sort %}
+    <div class="cargo-counter-chip">
+      <div class="cargo-counter-dot" style="background:{{ colors[ci.v % colors|length] }};"></div>
+      <span class="cargo-counter-name">{{ cargo }}</span>
+      <span class="cargo-counter-num">{{ count }}</span>
+    </div>
+    {%- set ci.v = ci.v + 1 -%}
+    {%- endfor %}
+  </div>
+  {%- endif %}
+
+  {# Timeline #}
+  <div style="overflow-x:auto;">
+    <div id="day-view" style="min-width:700px;position:relative;">
+
+      {# Header horas #}
+      <div style="display:grid;grid-template-columns:210px repeat({{ TH }},1fr);background:var(--navy);border-bottom:1px solid rgba(255,255,255,0.1);">
+        <div style="padding:9px 12px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.4px;">Colaborador</div>
+        {% for h in range(SH, SH + TH) %}<div style="font-size:9px;color:rgba(255,255,255,0.4);padding:8px 0 8px 4px;border-left:1px solid rgba(255,255,255,0.08);">{{ '%02d:00' % h }}</div>{% endfor %}
+      </div>
+
+      {# Agrupar colaboradores por cargo en vista diaria #}
+      {%- set dv_cargo = namespace(v='__NONE__') -%}
+      {% for row in grid_rows | sort(attribute='cargo_id') %}
+      {%- if row.cargo_id != dv_cargo.v %}
+      {%- set dv_cargo.v = row.cargo_id %}
+      <div style="display:grid;grid-template-columns:210px 1fr;background:var(--navy);">
+        <div style="padding:5px 12px;font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.5px;grid-column:1/-1;">{{ row.cargo_id or '—' }}</div>
+      </div>
+      {%- endif %}
+
+      {%- set dc = namespace(sid='LIBRE', col='') -%}
+      {%- for cell in row.cells -%}{%- if cell.date == sel_date -%}{%- set dc.sid = cell.shift_id -%}{%- set dc.col = cell.colacion_inicio|default('') -%}{%- endif -%}{%- endfor -%}
+      {%- set sid = dc.sid -%}
+      {%- set col_inicio = dc.col -%}
+      {%- set libre = (not sid or sid == 'LIBRE') -%}
+      {%- set isaus = sid in aus_codes -%}
+      {%- set blk = namespace(l=0.0, w=0.0, lbl='', cls='morning') -%}
+      {%- set col_blk = namespace(l=0.0, w=0.0, show=false) -%}
+      {%- if not libre and not isaus and cat_turnos and sid in cat_turnos -%}
+        {%- set tv = cat_turnos[sid] -%}
+        {%- set ih = tv.inicio[:2]|int + tv.inicio[3:5]|int / 60 -%}
+        {%- set fh = tv.fin[:2]|int + tv.fin[3:5]|int / 60 -%}
+        {%- if tv.cruza == 'SI' -%}{%- set fh = fh + 24 -%}{%- endif -%}
+        {%- set blk.l = [(ih - SH) / TH * 100, 0] | max -%}
+        {%- set blk.w = [(fh - ih) / TH * 100, 0] | max -%}
+        {%- if blk.l + blk.w > 100 -%}{%- set blk.w = 100 - blk.l -%}{%- endif -%}
+        {%- set blk.cls = 'morning' if tv.inicio[:2]|int < 9 else ('afternoon' if tv.inicio[:2]|int < 15 else 'evening') -%}
+        {%- set blk.lbl = shift_labels[sid] if shift_labels and sid in shift_labels else sid -%}
+        {# Calcular posición de colación dentro de la barra #}
+        {%- if col_inicio and ':' in col_inicio -%}
+          {%- set col_h = col_inicio[:2]|int + col_inicio[3:5]|int / 60 -%}
+          {%- set col_dur = 1.0 -%}{# 1 hora por defecto #}
+          {# Extraer duración de colación del shift_id (ej: S_0730_1630_60 -> 60 min) #}
+          {%- set sid_parts = sid.split('_') -%}
+          {%- if sid_parts|length >= 4 and sid_parts[3]|int > 0 -%}
+            {%- set col_dur = sid_parts[3]|int / 60 -%}
+          {%- endif -%}
+          {%- set col_blk.l = [(col_h - SH) / TH * 100, 0] | max -%}
+          {%- set col_blk.w = [col_dur / TH * 100, 0] | max -%}
+          {%- set col_blk.show = true -%}
+        {%- endif -%}
+      {%- endif -%}
+
+      <div style="display:grid;grid-template-columns:210px 1fr;border-bottom:1px solid var(--border);min-height:52px;">
+        <div style="padding:8px 12px;border-right:1px solid var(--border);display:flex;align-items:center;">
+          <div class="emp-cell">
+            <div class="emp-avatar">
+              {%- set p = row.nombre.split() -%}{% if p|length >= 2 %}{{ p[0][0] }}{{ p[-1][0] }}{% else %}{{ row.nombre[:2] }}{% endif %}
+            </div>
+            <div class="emp-info">
+              <div class="emp-name">{{ row.nombre }}</div>
+              <div class="emp-meta" style="font-size:10px;">{{ row.cargo_id }}</div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;overflow:hidden;">
+          {% for h in range(TH) %}<div style="position:absolute;top:0;bottom:0;left:{{ (h / TH * 100) | round(2) }}%;width:1px;background:var(--border);opacity:0.35;"></div>{% endfor %}
+          {% if libre %}<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:var(--muted);font-style:italic;">libre</div>
+          {% elif isaus %}<div class="shift-block aus-blk" style="left:2%;width:96%;">{{ sid }}</div>
+          {% elif blk.w > 0 %}
+            <div class="shift-block {{ blk.cls }}" style="left:{{ blk.l | round(2) }}%;width:{{ blk.w | round(2) }}%;" title="{{ blk.lbl }}">{{ blk.lbl }}</div>
+            {# Mostrar colación como bloque dentro del turno #}
+            {% if col_blk.show %}
+            <div class="colacion-block" style="left:{{ col_blk.l | round(2) }}%;width:{{ col_blk.w | round(2) }}%;" title="Colación {{ col_inicio }}">
+              <span class="colacion-icon">🍽️</span>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="now-line" id="now-line"><div class="now-dot"></div></div>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="day-cfg">{"sh":{{ SH }},"th":{{ TH }},"date":"{{ sel_date }}"}</script>
+{% endif %}
+
+{# ── FULLSCREEN DAY OVERLAY ── #}
+<div id="fs-overlay">
+  <div class="fs-topbar">
+    <button class="day-nav-btn" id="fs-prev" onclick="fsDayNav(-1)">‹</button>
+    <span class="fs-title" id="fs-title"></span>
+    <span class="fs-badge-today" id="fs-today-badge" style="display:none;">Hoy</span>
+    <button class="day-nav-btn" id="fs-next" onclick="fsDayNav(1)">›</button>
+    <span style="font-size:12px;color:rgba(255,255,255,.5);margin-left:8px;" id="fs-colab-count"></span>
+    <button class="fs-close" onclick="closeDayFullscreen()" title="Cerrar (Esc)">✕</button>
+  </div>
+  <div class="fs-chips" id="fs-chips"></div>
+  <div class="fs-body">
+    <div class="fs-time-hdr" id="fs-time-hdr"></div>
+    <div class="fs-timeline" id="fs-timeline"></div>
+    <div class="fs-chart-wrap">
+      <canvas id="fs-chart"></canvas>
+    </div>
+  </div>
+</div>
+
+{# Data JSON para el JS del fullscreen #}
+<script type="application/json" id="fs-data">
+{
+  "today": "{{ today_str }}",
+  "days": {{ days | tojson }},
+  "sh": 6, "th": 17,
+  "employees": [
+    {% for row in grid_rows %}
+    {
+      "id": {{ row.employee_id | tojson }},
+      "name": {{ row.nombre | tojson }},
+      "cargo": {{ (row.cargo_id or '') | tojson }},
+      "cells": [
+        {% for cell in row.cells %}
+        {"date":{{ cell.date | tojson }},"sid":{{ cell.shift_id | tojson }},"col":{{ (cell.colacion_inicio or '') | tojson }}}{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "shifts": {{ cat_turnos | tojson }},
+  "labels": {{ (shift_labels or {}) | tojson }},
+  "aus": {{ aus_codes | tojson }},
+  "demand": {{ (demand_curves or {"dias":[]}) | tojson }}
+}
+</script>
+
+{% else %}
+<!-- Sin run seleccionado -->
+<div class="grid-wrapper">
+  <div class="grid-empty">
+    <span class="grid-empty-icon">📋</span>
+    <div class="grid-empty-title">Selecciona una empresa y un run</div>
+    <div class="grid-empty-desc">Elige una empresa en el filtro de arriba para ver los turnos calculados.</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ── Badge de horas tiempo real ── */
+var DELTA = {};
+function renderHrs(empId) {
+  var span=document.getElementById('hrs-'+empId), bar=document.getElementById('bar-'+empId);
+  if(!span) return;
+  var asig=parseInt(span.dataset.asig||'0',10)+(DELTA[empId]||0);
+  var contrato=parseInt(span.dataset.contrato||'0',10);
+  if(asig<0) asig=0;
+  var aHH=String(Math.floor(asig/60)).padStart(2,'0'), aMM=String(asig%60).padStart(2,'0');
+  var cls='none';
+  if(contrato>0){
+    var pct=Math.round(asig/contrato*100), diff=asig-contrato;
+    span.textContent=Math.floor(contrato/60)+'h / '+aHH+':'+aMM+' ('+pct+'%)';
+    cls=Math.abs(diff)<=30?'ok':diff<0?'under':'over';
+    if(bar){bar.style.width=Math.min(pct,100)+'%';bar.className='hrs-fill '+cls;}
+  } else {
+    span.textContent=aHH+':'+aMM;
+    if(bar){bar.style.width='0%';bar.className='hrs-fill none';}
+  }
+  span.className='emp-hrs '+cls;
+}
+function initAllHrs(){document.querySelectorAll('.emp-hrs[data-emp]').forEach(function(s){renderHrs(s.dataset.emp);});}
+function minsFromId(sid){
+  if(!sid||sid==='LIBRE') return 0;
+  var p=sid.split('_');
+  if(p[0]==='S'&&p.length>=3){
+    var ini=parseInt(p[1].slice(0,2),10)*60+parseInt(p[1].slice(2,4),10);
+    var fin=parseInt(p[2].slice(0,2),10)*60+parseInt(p[2].slice(2,4),10);
+    if(fin<=ini) fin+=1440;
+    var pau=(p.length>=4&&!isNaN(parseInt(p[3],10)))?parseInt(p[3],10):0;
+    return Math.max(0,fin-ini-pau);
+  }
+  return 0;
+}
+
+/* ── Colores de selects ── */
+function colorSel(sel,val){
+  sel.style.borderColor=sel.style.background=sel.style.color='';
+  if(val==='LIBRE'){sel.style.background='#F0FDF4';sel.style.color='#166534';sel.style.borderColor='#BBF7D0';}
+  else if(val&&val.startsWith('S_')){
+    var h=parseInt((val.split('_')[1]||'00').slice(0,2),10);
+    if(h<9){sel.style.background='#EFF6FF';sel.style.color='#1D4ED8';sel.style.borderColor='#BFDBFE';}
+    else if(h<15){sel.style.background='#FFFBEB';sel.style.color='#B45309';sel.style.borderColor='#FDE68A';}
+    else{sel.style.background='#F5F3FF';sel.style.color='#6D28D9';sel.style.borderColor='#DDD6FE';}
+  } else if(val){sel.style.background='#FFF5F5';sel.style.color='#DC2626';sel.style.borderColor='#FECACA';}
+}
+
+/* ── Tracking de cambios ── */
+var changesMap={};
+function onShiftChange(sel){
+  var key=sel.name;
+  if(sel.value!==sel.dataset.original){changesMap[key]=sel.value;sel.classList.add('changed');}
+  else{delete changesMap[key];sel.classList.remove('changed');if(sel.classList.contains('is-override'))sel.classList.add('changed');}
+  colorSel(sel,sel.value);
+  var empId=key.split('_').slice(1,-1).join('_');
+  var delta=0;
+  document.querySelectorAll('select[name^="cell_'+empId+'_"]').forEach(function(s){
+    if(s.value!==s.dataset.original) delta+=minsFromId(s.value)-minsFromId(s.dataset.original);
+  });
+  DELTA[empId]=delta; renderHrs(empId); updateBar();
+}
+function updateBar(){
+  var n=Object.keys(changesMap).length;
+  var ind=document.getElementById('changes-indicator'),bs=document.getElementById('btn-save'),
+      bd=document.getElementById('btn-discard'),ce=document.getElementById('changes-count');
+  if(n>0){ind.style.display='flex';bd.style.display='flex';bs.disabled=false;ce.textContent=n;}
+  else{ind.style.display='none';bd.style.display='none';bs.disabled=true;}
+}
+function saveChanges(){if(Object.keys(changesMap).length===0)return;document.getElementById('edit-form').submit();}
+function discardChanges(){
+  document.querySelectorAll('.shift-select').forEach(function(sel){sel.value=sel.dataset.original;sel.classList.remove('changed');colorSel(sel,sel.value);});
+  DELTA={};changesMap={};updateBar();initAllHrs();
+}
+function applyFilters(){
+  var params=new URLSearchParams();
+  var c=document.getElementById('sel-company'),b=document.getElementById('sel-branch'),
+      o=document.getElementById('sel-ou'),r=document.getElementById('sel-run'),q=document.getElementById('search-q');
+  if(c&&c.value)params.set('company_id',c.value);if(b&&b.value)params.set('branch_id',b.value);
+  if(o&&o.value)params.set('org_unit_id',o.value);if(r&&r.value)params.set('run_id',r.value);
+  if(q&&q.value)params.set('q',q.value);
+  window.location.href='/ui/plan?'+params.toString();
+}
+function goWeek(ws){
+  var p=new URLSearchParams(window.location.search);p.set('week_start',ws);
+  window.location.href='/ui/plan?'+p.toString();
+}
+
+/* ── Curvas de demanda — un gráfico por día ── */
+function initDemandCharts(){
+  var raw=document.getElementById('demand-curves-data');
+  if(!raw) return;
+  var curve;
+  try{curve=JSON.parse(raw.textContent);}catch(e){return;}
+  if(!curve||!curve.dias) return;
+
+  /* Escala Y global */
+  var globalMax=0;
+  curve.dias.forEach(function(dia){
+    var vals=(dia.minimo||[]).concat(dia.ideal||[]).concat(dia.cubiertos||[]);
+    var mx=Math.max.apply(null,vals.filter(function(v){return typeof v==='number';}));
+    if(mx>globalMax) globalMax=mx;
+  });
+  var yMax=Math.max(Math.ceil(globalMax*1.2),4);
+
+  curve.dias.forEach(function(dia,i){
+    if(!dia.tiene_demanda) return;
+    var canvas=document.getElementById('dc-'+i);
+    if(!canvas) return;
+    var labels=(dia.franjas||[]).map(function(f,idx){return idx%2===0?f.slice(0,5):'';});
+    new Chart(canvas,{
+      data:{
+        labels:labels,
+        datasets:[
+          {type:'bar',label:'Cubiertos',data:dia.cubiertos,
+           backgroundColor:'rgba(55,138,221,0.75)',borderColor:'rgba(55,138,221,0.9)',
+           borderWidth:0.5,borderRadius:2,categoryPercentage:1.0,barPercentage:0.85,order:3},
+          {type:'line',label:'Mínimo',data:dia.minimo,
+           borderColor:'#EF4444',borderWidth:1.5,pointRadius:0,tension:0.1,fill:false,order:1},
+          {type:'line',label:'Ideal',data:dia.ideal,
+           borderColor:'#10B981',borderWidth:1.5,borderDash:[4,3],
+           pointRadius:0,tension:0.1,fill:false,order:0}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{mode:'index',intersect:false,
+            callbacks:{
+              title:function(items){return (dia.franjas||[])[items[0].dataIndex]||'';},
+              label:function(c){return c.dataset.label+': '+(c.raw||0)+' p.';}
+            }
+          }
+        },
+        scales:{
+          x:{ticks:{font:{size:8},color:'#94A3B8',autoSkip:false,maxRotation:0},
+             grid:{color:'rgba(148,163,184,0.08)'}},
+          y:{min:0,max:yMax,
+             ticks:{font:{size:8},color:'#94A3B8',maxTicksLimit:4,stepSize:Math.ceil(yMax/4)},
+             grid:{color:'rgba(148,163,184,0.1)'}}
+        }
+      }
+    });
+  });
+}
+
+/* ── Now Line con auto-refresh ── */
+function updateNowLine(){
+  var el=document.getElementById('day-cfg'); if(!el) return;
+  var cfg; try{cfg=JSON.parse(el.textContent);}catch(e){return;}
+  var now=new Date(), tod=now.toISOString().slice(0,10);
+  var line=document.getElementById('now-line'); if(!line) return;
+  
+  // Si no es hoy, ocultar la línea
+  if(cfg.date!==tod) {
+    line.style.display='none';
+    return;
+  }
+  
+  var hNow=now.getHours()+now.getMinutes()/60;
+  var pct=(hNow-cfg.sh)/cfg.th*100;
+  
+  // Si está fuera del rango visible, ocultar
+  if(pct<0||pct>100) {
+    line.style.display='none';
+    return;
+  }
+  
+  var wrap=document.getElementById('day-view'); if(!wrap) return;
+  line.style.left=(210+(wrap.offsetWidth-210)*pct/100)+'px';
+  line.style.display='block';
+}
+
+function initNowLine(){
+  // Actualizar inmediatamente
+  updateNowLine();
+  // Auto-refresh cada 60 segundos
+  setInterval(updateNowLine, 60000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FULLSCREEN DAY VIEW v1
+   ═══════════════════════════════════════════════════════════════════════════ */
+var FS = null, fsChart = null, fsDate = null, fsInterval = null;
+
+function _parseFS(){
+  if(FS) return FS;
+  var el=document.getElementById('fs-data');
+  if(!el) return null;
+  try{FS=JSON.parse(el.textContent);}catch(e){return null;}
+  return FS;
+}
+
+function openDayFullscreen(dt){
+  var d=_parseFS(); if(!d) return;
+  fsDate=dt;
+  var ov=document.getElementById('fs-overlay');
+  ov.classList.add('open');
+  document.body.style.overflow='hidden';
+  _renderFS(dt);
+  _fsNowLine();
+  if(fsInterval) clearInterval(fsInterval);
+  fsInterval=setInterval(function(){_fsNowLine();},60000);
+}
+
+function closeDayFullscreen(){
+  document.getElementById('fs-overlay').classList.remove('open');
+  document.body.style.overflow='';
+  if(fsInterval){clearInterval(fsInterval);fsInterval=null;}
+}
+
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDayFullscreen();});
+
+function fsDayNav(dir){
+  var d=_parseFS(); if(!d) return;
+  var dates=d.days.map(function(x){return x.date;});
+  var idx=dates.indexOf(fsDate);
+  var ni=idx+dir;
+  if(ni>=0&&ni<dates.length){fsDate=dates[ni];_renderFS(fsDate);}
+}
+
+function _renderFS(dt){
+  var d=_parseFS(); if(!d) return;
+  var SH=d.sh, TH=d.th;
+
+  // Title
+  var dayObj=d.days.find(function(x){return x.date===dt;});
+  var lbl=dayObj?(dayObj.label+' · '+dt):dt;
+  document.getElementById('fs-title').textContent=lbl;
+  var tb=document.getElementById('fs-today-badge');
+  tb.style.display=(dt===d.today)?'inline':'none';
+  document.getElementById('fs-colab-count').textContent=d.employees.length+' colaboradores';
+
+  // Time header
+  var hdr=document.getElementById('fs-time-hdr');
+  hdr.style.setProperty('--th',TH);
+  hdr.innerHTML='<div>Colaborador</div>';
+  for(var h=SH;h<SH+TH;h++) hdr.innerHTML+='<div>'+String(h).padStart(2,'0')+':00</div>';
+
+  // Build employees for this day
+  var emps=[];
+  d.employees.forEach(function(emp){
+    var cell=emp.cells.find(function(c){return c.date===dt;});
+    if(!cell) return;
+    var sid=cell.sid, col=cell.col||'';
+    var libre=(!sid||sid==='LIBRE'), isAus=d.aus.indexOf(sid)>=0;
+    var sh=d.shifts[sid];
+    var sMin=0,eMin=0,colMin=0,colDur=0,colWinS=0,colWinE=0;
+    if(sh&&!libre&&!isAus){
+      sMin=parseInt(sh.inicio.slice(0,2))*60+parseInt(sh.inicio.slice(3,5));
+      eMin=parseInt(sh.fin.slice(0,2))*60+parseInt(sh.fin.slice(3,5));
+      if(sh.cruza==='SI') eMin+=1440;
+      var parts=sid.split('_');
+      colDur=(parts.length>=4&&!isNaN(parseInt(parts[3])))?parseInt(parts[3]):0;
+      if(col&&col.indexOf(':')>0) colMin=parseInt(col.slice(0,2))*60+parseInt(col.slice(3,5));
+      if(colDur>0){colWinS=sMin+30; colWinE=eMin-colDur-30;}
+    }
+    emps.push({id:emp.id,name:emp.name,cargo:emp.cargo,sid:sid,libre:libre,isAus:isAus,
+      sMin:sMin,eMin:eMin,colMin:colMin,colDur:colDur,colWinS:colWinS,colWinE:colWinE,
+      label:d.labels[sid]||sid});
+  });
+
+  // Chips
+  var cargos={};
+  emps.forEach(function(e){if(!e.libre&&!e.isAus){cargos[e.cargo]=(cargos[e.cargo]||0)+1;}});
+  var colors=['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444'];
+  var chips='<span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:4px;">Trabajando hoy:</span>';
+  var ci=0;
+  for(var c in cargos){
+    chips+='<div class="cargo-counter-chip"><div class="cargo-counter-dot" style="background:'+colors[ci%colors.length]+'"></div><span class="cargo-counter-name">'+c+'</span><span class="cargo-counter-num">'+cargos[c]+'</span></div>';
+    ci++;
+  }
+  document.getElementById('fs-chips').innerHTML=chips;
+
+  // Timeline rows
+  var tl=document.getElementById('fs-timeline');
+  var html='';
+  var lastCargo='';
+  // Sort by cargo then name
+  emps.sort(function(a,b){return (a.cargo+a.name).localeCompare(b.cargo+b.name);});
+  emps.forEach(function(e,i){
+    if(e.cargo!==lastCargo){lastCargo=e.cargo; html+='<div class="fs-cargo-hdr">'+e.cargo+'</div>';}
+    var initials=e.name.split(' ');
+    var ini=(initials.length>=2)?(initials[0][0]+initials[initials.length-1][0]):e.name.slice(0,2);
+    html+='<div class="fs-row"><div class="fs-emp"><div class="emp-avatar">'+ini.toUpperCase()+'</div><div class="emp-info"><div class="emp-name" style="font-size:12px;">'+e.name+'</div><div class="emp-meta" style="font-size:10px;">'+e.cargo+'</div></div></div>';
+    html+='<div class="fs-bar-area" data-idx="'+i+'">';
+    // Grid lines
+    for(var h=0;h<TH;h++) html+='<div class="fs-grid-line" style="left:'+((h/TH*100).toFixed(2))+'%"></div>';
+    if(e.libre){html+='<div class="fs-libre">libre</div>';}
+    else if(e.isAus){html+='<div class="fs-shift" style="left:2%;width:96%;background:#FFF5F5;color:#DC2626;border-color:#FCA5A5;">'+e.sid+'</div>';}
+    else if(e.sMin>0||e.eMin>0){
+      var sl=Math.max((e.sMin/60-SH)/TH*100,0), sw=Math.max(((e.eMin-e.sMin)/60)/TH*100,0);
+      if(sl+sw>100) sw=100-sl;
+      var cls=(e.sMin/60<9)?'morning':(e.sMin/60<15?'afternoon':'evening');
+      html+='<div class="fs-shift '+cls+'" style="left:'+sl.toFixed(2)+'%;width:'+sw.toFixed(2)+'%;">'+e.label+'</div>';
+      // Colación block (draggable)
+      if(e.colDur>0&&e.colMin>0){
+        var cl=Math.max((e.colMin/60-SH)/TH*100,0), cw=Math.max((e.colDur/60)/TH*100,0);
+        html+='<div class="fs-col-block" data-emp-idx="'+i+'" style="left:'+cl.toFixed(2)+'%;width:'+cw.toFixed(2)+'%;" title="Colación '+_m2hm(e.colMin)+' (arrastrar para mover)">🍽️</div>';
+      }
+    }
+    html+='</div></div>';
+  });
+  tl.innerHTML=html;
+
+  // Store emps globally for chart/drag
+  FS._emps=emps; FS._dt=dt; FS._SH=SH; FS._TH=TH;
+
+  // Enable drag
+  _fsDragInit();
+  // Draw coverage chart
+  _fsCoverageChart();
+  // Now line
+  _fsNowLine();
+}
+
+function _m2hm(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+
+/* ── Drag & Drop colaciones ── */
+function _fsDragInit(){
+  document.querySelectorAll('.fs-col-block').forEach(function(el){
+    el.addEventListener('mousedown',_fsDragStart);
+    el.addEventListener('touchstart',_fsDragStart,{passive:false});
+  });
+}
+
+var _dragEl=null, _dragStartX=0, _dragOrigLeft=0, _dragArea=null;
+
+function _fsDragStart(ev){
+  ev.preventDefault();
+  _dragEl=this;
+  _dragEl.classList.add('dragging');
+  _dragArea=_dragEl.parentElement;
+  _dragStartX=(ev.touches?ev.touches[0].clientX:ev.clientX);
+  _dragOrigLeft=parseFloat(_dragEl.style.left);
+  document.addEventListener('mousemove',_fsDragMove);
+  document.addEventListener('mouseup',_fsDragEnd);
+  document.addEventListener('touchmove',_fsDragMove,{passive:false});
+  document.addEventListener('touchend',_fsDragEnd);
+}
+
+function _fsDragMove(ev){
+  if(!_dragEl) return;
+  ev.preventDefault();
+  var cx=(ev.touches?ev.touches[0].clientX:ev.clientX);
+  var dx=cx-_dragStartX;
+  var areaW=_dragArea.offsetWidth;
+  var dpct=dx/areaW*100;
+  var newLeft=_dragOrigLeft+dpct;
+  // Snap to 30min grid
+  var SH=FS._SH, TH=FS._TH;
+  var minH=newLeft/100*TH+SH;
+  var snapped=Math.round(minH*2)/2; // snap to 0.5h = 30min
+  var snappedLeft=(snapped-SH)/TH*100;
+  // Clamp to colación window
+  var idx=parseInt(_dragEl.dataset.empIdx);
+  var emp=FS._emps[idx];
+  var winSPct=(emp.colWinS/60-SH)/TH*100;
+  var winEPct=(emp.colWinE/60-SH)/TH*100;
+  snappedLeft=Math.max(winSPct,Math.min(winEPct,snappedLeft));
+  _dragEl.style.left=snappedLeft.toFixed(2)+'%';
+}
+
+function _fsDragEnd(ev){
+  if(!_dragEl) return;
+  _dragEl.classList.remove('dragging');
+  // Compute new colMin
+  var SH=FS._SH, TH=FS._TH;
+  var newLeft=parseFloat(_dragEl.style.left);
+  var newH=newLeft/100*TH+SH;
+  var newMin=Math.round(newH*60);
+  // Snap to 30
+  newMin=Math.round(newMin/30)*30;
+  var idx=parseInt(_dragEl.dataset.empIdx);
+  FS._emps[idx].colMin=newMin;
+  _dragEl.title='Colación '+_m2hm(newMin)+' (arrastrar para mover)';
+  // Recalc chart + check coverage
+  _fsCoverageChart();
+  _fsCheckCoverageWarning(FS._emps[idx].name, newMin);
+  // Cleanup
+  _dragEl=null;
+  document.removeEventListener('mousemove',_fsDragMove);
+  document.removeEventListener('mouseup',_fsDragEnd);
+  document.removeEventListener('touchmove',_fsDragMove);
+  document.removeEventListener('touchend',_fsDragEnd);
+}
+
+/* ── Warning popup when coverage drops below minimum ── */
+function _fsCheckCoverageWarning(empName, colMin){
+  if(!FS||!FS._emps) return;
+  var SH=FS._SH, TH=FS._TH, SLOT=30;
+  var demDay=null;
+  if(FS.demand&&FS.demand.dias) demDay=FS.demand.dias.find(function(dd){return dd.fecha===FS._dt;});
+  // Check all slots for violations
+  var violations=[];
+  for(var m=SH*60;m<(SH+TH)*60;m+=SLOT){
+    var trabajando=0, enCol=0;
+    FS._emps.forEach(function(e){
+      if(e.libre||e.isAus) return;
+      if(m>=e.sMin&&m<e.eMin) trabajando++;
+      if(e.colDur>0&&e.colMin>0&&m>=e.colMin&&m<e.colMin+e.colDur) enCol++;
+    });
+    var real=trabajando-enCol;
+    var minReq=0;
+    if(demDay&&demDay.franjas&&demDay.minimo){
+      var fi=demDay.franjas.indexOf(_m2hm(m));
+      if(fi>=0) minReq=demDay.minimo[fi]||0;
+    }
+    if(real<minReq) violations.push({slot:_m2hm(m),real:real,min:minReq});
+  }
+  if(violations.length>0){
+    var msg='⚠️ Advertencia: mover la colación de '+empName+' a las '+_m2hm(colMin)+' deja la cobertura bajo el mínimo operativo en:\n\n';
+    violations.forEach(function(v){
+      msg+='  • '+v.slot+': '+v.real+' personas (mínimo '+v.min+')\n';
+    });
+    msg+='\nEl cambio se aplicó pero puede generar problemas operativos.';
+    // Use a non-blocking toast instead of alert for better UX
+    _fsShowToast(msg);
+  }
+}
+
+var _fsToastTimer=null;
+function _fsShowToast(msg){
+  var existing=document.getElementById('fs-toast');
+  if(existing) existing.remove();
+  var toast=document.createElement('div');
+  toast.id='fs-toast';
+  toast.style.cssText='position:fixed;top:60px;right:20px;max-width:420px;padding:14px 18px;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:10px;color:#991B1B;font-size:12.5px;font-weight:500;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,.15);white-space:pre-line;line-height:1.5;animation:fsToastIn .3s ease;';
+  toast.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div>'+msg.replace(/\n/g,'<br>')+'</div><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#991B1B;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 2px;">✕</button></div>';
+  document.body.appendChild(toast);
+  if(_fsToastTimer) clearTimeout(_fsToastTimer);
+  _fsToastTimer=setTimeout(function(){var t=document.getElementById('fs-toast');if(t)t.remove();},8000);
+}
+
+/* ── Coverage Chart ── */
+function _fsCoverageChart(){
+  if(!FS||!FS._emps) return;
+  var SH=FS._SH, TH=FS._TH, SLOT=30;
+  var slots=[]; // each slot: {label, cubiertos, enCol, real}
+  for(var m=SH*60;m<(SH+TH)*60;m+=SLOT){
+    var label=_m2hm(m);
+    var trabajando=0, enCol=0;
+    FS._emps.forEach(function(e){
+      if(e.libre||e.isAus) return;
+      // Is this person working at this slot?
+      if(m>=e.sMin&&m<e.eMin) trabajando++;
+      // Is this person in colación at this slot?
+      if(e.colDur>0&&e.colMin>0&&m>=e.colMin&&m<e.colMin+e.colDur) enCol++;
+    });
+    slots.push({label:label,trabajando:trabajando,enCol:enCol,real:trabajando-enCol});
+  }
+
+  // Get demand for this day
+  var demDay=null;
+  if(FS.demand&&FS.demand.dias){
+    demDay=FS.demand.dias.find(function(dd){return dd.fecha===FS._dt;});
+  }
+  var minLine=[], idealLine=[];
+  slots.forEach(function(s,i){
+    if(demDay&&demDay.minimo&&demDay.franjas){
+      var fi=demDay.franjas.indexOf(s.label);
+      if(fi<0) fi=demDay.franjas.indexOf(s.label.slice(0,5));
+      minLine.push(fi>=0?(demDay.minimo[fi]||0):0);
+      idealLine.push(fi>=0?(demDay.ideal[fi]||0):0);
+    } else { minLine.push(0); idealLine.push(0); }
+  });
+
+  // Colors: below min=red, at min=amber, above=blue
+  var barColors=slots.map(function(s,i){
+    if(s.real<minLine[i]) return 'rgba(239,68,68,0.8)';
+    if(s.real===minLine[i]) return 'rgba(245,158,11,0.75)';
+    return 'rgba(55,138,221,0.8)';
+  });
+
+  var canvas=document.getElementById('fs-chart');
+  if(fsChart){fsChart.destroy();}
+  var yMax=Math.max(Math.ceil(Math.max.apply(null,slots.map(function(s){return s.trabajando;}).concat(minLine).concat(idealLine))*1.3),4);
+
+  fsChart=new Chart(canvas,{
+    data:{
+      labels:slots.map(function(s){return s.label;}),
+      datasets:[
+        {type:'bar',label:'Cobertura real (sin colación)',data:slots.map(function(s){return s.real;}),
+         backgroundColor:barColors,borderWidth:0,borderRadius:2,
+         categoryPercentage:1.0,barPercentage:0.85,order:3},
+        {type:'line',label:'Mínimo',data:minLine,
+         borderColor:'#EF4444',borderWidth:2,pointRadius:0,tension:0.1,fill:false,order:1},
+        {type:'line',label:'Ideal',data:idealLine,
+         borderColor:'#10B981',borderWidth:1.5,borderDash:[4,3],
+         pointRadius:0,tension:0.1,fill:false,order:0}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{
+        legend:{display:true,position:'top',labels:{font:{size:10},usePointStyle:true,padding:12}},
+        tooltip:{mode:'index',intersect:false,
+          callbacks:{
+            label:function(c){
+              if(c.datasetIndex===0){
+                var s=slots[c.dataIndex];
+                return 'Trabajando: '+s.trabajando+' · En colación: '+s.enCol+' · Cobertura: '+s.real;
+              }
+              return c.dataset.label+': '+c.raw;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{font:{size:9},color:'#94A3B8',autoSkip:true,maxRotation:0},
+           grid:{color:'rgba(148,163,184,0.08)'}},
+        y:{min:0,max:yMax,
+           ticks:{font:{size:9},color:'#94A3B8',stepSize:1},
+           grid:{color:'rgba(148,163,184,0.1)'}}
+      }
+    }
+  });
+}
+
+/* ── Now Line ── */
+function _fsNowLine(){
+  if(!FS||!FS._dt) return;
+  var tl=document.getElementById('fs-timeline');
+  var old=tl.querySelector('.fs-now'); if(old) old.remove();
+  var now=new Date(), tod=now.toISOString().slice(0,10);
+  if(FS._dt!==tod) return;
+  var hNow=now.getHours()+now.getMinutes()/60;
+  var pct=(hNow-FS._SH)/FS._TH*100;
+  if(pct<0||pct>100) return;
+  var empW=200;
+  var totalW=tl.offsetWidth||tl.scrollWidth||900;
+  var barW=totalW-empW;
+  var px=empW+barW*pct/100;
+  var line=document.createElement('div');
+  line.className='fs-now';
+  line.style.left=px+'px';
+  line.innerHTML='<div class="fs-now-dot"></div>';
+  tl.appendChild(line);
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('.shift-select').forEach(function(sel){
+    colorSel(sel,sel.value);
+    sel.addEventListener('change',function(){colorSel(this,this.value);});
+  });
+  initAllHrs();
+  initDemandCharts();
+  initNowLine();
+});
+</script>
+{% endblock %}

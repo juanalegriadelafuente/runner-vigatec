@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>Restricciones</h2>
+  <p class="muted">OU: {{ org_unit.org_unit_key }} - {{ org_unit.name }}</p>
+  <p>
+    <a href="/ui/org-units/{{ org_unit.id }}">← Volver a OU</a> |
+    <a href="/ui/org-units/{{ org_unit.id }}/ausentismos">Ausentismos</a>
+  </p>
+</div>
+
+<div class="card">
+  <h3>Agregar restricción</h3>
+  <form method="post" action="/ui/org-units/{{ org_unit.id }}/restricciones">
+
+    <label>Aplica a</label>
+    <select name="employee_id">
+      <option value="GLOBAL">GLOBAL (sin empleado)</option>
+      {% for e in employees %}
+        <option value="{{ e.employee_key }}">{{ e.employee_key }} — {{ e.nombre }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Tipo (controlado)</label>
+    <select name="tipo" required>
+      {% for t in tipos %}
+        <option value="{{ t.value }}">{{ t.value }}{% if t.label %} — {{ t.label }}{% endif %}</option>
+      {% endfor %}
+    </select>
+
+    <div class="row">
+      <div class="col">
+        <label>valor1</label>
+        <input name="valor1" placeholder="Ej: LUN / Administrador de tienda">
+      </div>
+      <div class="col">
+        <label>valor2</label>
+        <input name="valor2" placeholder="Opcional">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>día semana (opcional)</label>
+        <select name="dia_semana">
+          <option value="">(vacío)</option>
+          <option>LUN</option><option>MAR</option><option>MIE</option><option>JUE</option><option>VIE</option><option>SAB</option><option>DOM</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>fecha (opcional)</label>
+        <input name="fecha" placeholder="2026-03-30">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Hard</label>
+        <select name="hard">
+          <option value="0" selected>0</option>
+          <option value="1">1</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Penalización</label>
+        <input name="penalizacion" type="number" value="0">
+      </div>
+    </div>
+
+    <label>Detalle</label>
+    <input name="detalle" placeholder="Opcional">
+
+    <button type="submit" style="margin-top:10px;">Guardar</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Últimas restricciones</h3>
+  <table>
+    <thead><tr><th>Empleado</th><th>Tipo</th><th>v1</th><th>v2</th><th>Día</th><th>Fecha</th><th>Hard</th><th>Pen</th></tr></thead>
+    <tbody>
+      {% for x in items %}
+      <tr>
+        <td>{{ x.employee_id or "GLOBAL" }}</td>
+        <td>{{ x.tipo }}</td>
+        <td class="muted">{{ x.valor1 or "" }}</td>
+        <td class="muted">{{ x.valor2 or "" }}</td>
+        <td>{{ x.dia_semana or "" }}</td>
+        <td>{{ x.fecha or "" }}</td>
+        <td>{{ 1 if x.hard else 0 }}</td>
+        <td>{{ x.penalizacion }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

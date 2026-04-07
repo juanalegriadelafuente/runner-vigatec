@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Ausentismos{% endblock %}
+{% block page_title %}Ausentismos{% endblock %}
+{% block page_subtitle %}Bandeja global de ausentismos por empresa{% endblock %}
+
+{% block topbar_actions %}
+{% if selected_company_id %}
+<button class="btn btn-primary" onclick="document.getElementById('modal-new').style.display='flex'">+ Registrar ausentismo</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if err %}<div class="alert-msg alert-err mb-16">❌ {{ err }}</div>{% endif %}
+
+<!-- Filtros -->
+<div class="filter-bar mb-16">
+  <form method="get" action="{{ url_for('ui_ausentismos') }}" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+    <div class="filter-group">
+      <span class="filter-label">Empresa</span>
+      <select name="company_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Elige…</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if selected_company_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if branches %}
+    <div class="filter-group">
+      <span class="filter-label">Sucursal</span>
+      <select name="branch_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for b in branches %}
+        <option value="{{ b.id }}" {% if selected_branch_id == b.id|string %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if org_units %}
+    <div class="filter-group">
+      <span class="filter-label">OU</span>
+      <select name="org_unit_id" class="filter-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for ou in org_units %}
+        <option value="{{ ou.id }}" {% if selected_org_unit_id == ou.id|string %}selected{% endif %}>{{ ou.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if aus_codes %}
+    <div class="filter-group">
+      <span class="filter-label">Tipo</span>
+      <select name="tipo" class="filter-select">
+        <option value="">Todos</option>
+        {% for code in aus_codes %}
+        <option value="{{ code }}" {% if tipo == code %}selected{% endif %}>{{ code }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-group">
+      <span class="filter-label">Desde</span>
+      <input type="date" name="from" value="{{ from or '' }}" class="filter-select">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Hasta</span>
+      <input type="date" name="to" value="{{ to or '' }}" class="filter-select">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+    <a href="{{ url_for('ui_ausentismos') }}" class="btn btn-ghost btn-sm">Limpiar</a>
+  </form>
+</div>
+
+<!-- Tabla -->
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-title"><div class="panel-title-icon">🏥</div>Ausentismos registrados</div>
+    {% if rows %}<span class="text-muted text-sm">{{ rows | length }} registros</span>{% endif %}
+  </div>
+
+  {% if not selected_company_id %}
+  <div class="empty-state">
+    <div class="empty-icon">🏥</div>
+    <div class="empty-title">Selecciona una empresa</div>
+    <div class="empty-desc">Elige una empresa en el filtro para ver los ausentismos.</div>
+  </div>
+  {% elif rows %}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Colaborador</th>
+          <th>Tipo</th>
+          <th>Desde</th>
+          <th>Hasta</th>
+          <th>Hard</th>
+          <th>Detalle</th>
+          <th class="td-actions">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set emp = employee_by_key.get(row.employee_id) %}
+        <tr>
+          <td>
+            <div class="td-name">{{ emp.nombre if emp else row.employee_id }}</div>
+            <div class="td-muted">{{ row.employee_id }}</div>
+          </td>
+          <td><span class="badge badge-amber">{{ row.ausentismo or '—' }}</span></td>
+          <td class="td-mono">{{ row.fecha_inicio or '—' }}</td>
+          <td class="td-mono">{{ row.fecha_fin or '—' }}</td>
+          <td>
+            {% if row.hard %}
+              <span class="badge badge-red">Hard</span>
+            {% else %}
+              <span class="badge badge-gray">Soft</span>
+            {% endif %}
+          </td>
+          <td class="td-muted">{{ row.detalle or '—' }}</td>
+          <td class="td-actions">
+            <form method="post" action="{{ url_for('ui_ausentismos_delete', aus_id=row.id) }}" onsubmit="return confirm('¿Eliminar este ausentismo?')">
+              <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">✅</div>
+    <div class="empty-title">Sin ausentismos</div>
+    <div class="empty-desc">No hay ausentismos registrados con los filtros actuales.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal nuevo ausentismo -->
+{% if selected_company_id %}
+<div id="modal-new" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">Registrar ausentismo</div>
+      <button class="modal-close" onclick="document.getElementById('modal-new').style.display='none'">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('ui_ausentismos_add') }}">
+      <input type="hidden" name="company_id" value="{{ selected_company_id }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Colaborador <span class="required">*</span></label>
+          <select name="employee_uuid" class="form-control" required>
+            <option value="">Seleccionar…</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}">{{ emp.nombre }} ({{ emp.employee_key }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo <span class="required">*</span></label>
+            <select name="ausentismo" class="form-control" required>
+              <option value="">Seleccionar…</option>
+              {% for code in aus_codes %}
+              <option value="{{ code }}">{{ code }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hard</label>
+            <select name="hard" class="form-control">
+              <option value="1">Sí (Hard)</option>
+              <option value="0">No (Soft)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Desde <span class="required">*</span></label>
+            <input type="date" name="fecha_inicio" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hasta <span class="required">*</span></label>
+            <input type="date" name="fecha_fin" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Detalle</label>
+          <input type="text" name="detalle" class="form-control" placeholder="Descripción opcional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-new').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.filter-bar { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm); }
+.filter-group { display:flex;flex-direction:column;gap:4px; }
+.filter-label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px; }
+.filter-select { padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--bg);font-family:'DM Sans',sans-serif;outline:none;min-width:130px; }
+.filter-select:focus { border-color:var(--accent);background:white; }
+.mb-16 { margin-bottom:16px; }
+</style>
+{% endblock %}

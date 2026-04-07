@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}{{ company.name }}{% endblock %}
+{% block page_title %}{{ company.name }}{% endblock %}
+{% block page_subtitle %}Configuración y wizard de onboarding{% endblock %}
+
+{% block topbar_actions %}
+<a href="/ui/companies/{{ company.id }}/vocab" class="btn btn-ghost btn-sm">⚙️ Listas del solver</a>
+{% endblock %}
+
+{% block content %}
+
+{% if err %}
+  {% if "IMPORT_OK" in err %}
+    <div class="alert-msg alert-ok mb-16">✅ {{ err }}</div>
+  {% else %}
+    <div class="alert-msg alert-err mb-16">❌ {{ err }}</div>
+  {% endif %}
+{% endif %}
+
+<!-- Wizard de setup -->
+<div class="panel mb-16">
+  <div class="panel-header">
+    <div class="panel-title"><div class="panel-title-icon">🧭</div>Setup (Wizard)</div>
+    <span class="text-muted text-sm">Completa estos pasos para habilitar "Pedir turnos"</span>
+  </div>
+  <div class="panel-body" style="padding:0;">
+    {% set steps_list = [
+      ('template',  'Template',               'Catálogo turnos, jornadas, reglas, etc. (base del solver)'),
+      ('branches',  'Sucursales',             'Estructura: empresa → sucursal → OU'),
+      ('org_units', 'Unidades Organizativas', 'La demanda y el pool se definen por OU'),
+      ('employees', 'Empleados',              'Dotación (jornada, cargo, contrato, expertise)'),
+      ('demand',    'Demanda',                'DemandaUnidad: tramos por día y requeridos'),
+      ('pool',      'Pool',                   'PoolTurnos: qué turnos puede usar por cargo/OU/día'),
+    ] %}
+    {% for key, label, desc in steps_list %}
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 18px;border-bottom:1px solid var(--border);">
+      <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;
+        {% if steps[key] %}background:#D1FAE5;color:#065F46;{% else %}background:#FEF3C7;color:#92400E;{% endif %}">
+        {% if steps[key] %}✓{% else %}!{% endif %}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">{{ label }}</div>
+        <div style="font-size:12px;color:var(--muted);">{{ desc }}</div>
+      </div>
+      <span class="badge {% if steps[key] %}badge-green{% else %}badge-amber{% endif %}">
+        {% if steps[key] %}OK{% else %}FALTA{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Columna izquierda -->
+  <div>
+
+    <!-- Template solver -->
+    <div class="panel mb-16">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-icon">📋</div>Template base del solver</div>
+        {% if template_exists %}
+          <span class="badge badge-green">Cargado</span>
+        {% else %}
+          <span class="badge badge-amber">Sin template</span>
+        {% endif %}
+      </div>
+      <div class="panel-body">
+        <p class="text-muted text-sm mb-16">Sube el Excel con hojas: <strong>CatalogoTurnos</strong>, <strong>Jornadas</strong>, <strong>Reglas</strong>, etc. (una vez por empresa, no por corrida).</p>
+        <form method="post" action="/ui/companies/{{ company.id }}/template" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <input type="file" name="file" accept=".xlsx" required class="form-control">
+          </div>
+          <button type="submit" class="btn btn-primary">Subir template</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Pedir turnos -->
+    <div class="panel mb-16">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-icon">▶</div>Pedir turnos</div>
+      </div>
+      <div class="panel-body">
+        <p class="text-muted text-sm mb-16">Genera automáticamente el <strong>case.xlsx</strong> desde la BD y ejecuta el solver.</p>
+        <form method="post" action="/ui/companies/{{ company.id }}/request-turnos" style="display:flex;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Mes (YYYY-MM)</label>
+            <input name="month" placeholder="2026-03" class="form-control" style="width:140px;"
+              {% if not ready_to_run %}disabled{% endif %} required>
+          </div>
+          <button type="submit" class="btn btn-secondary" {% if not ready_to_run %}disabled{% endif %}>
+            ▶ Pedir turnos
+          </button>
+        </form>
+        {% if not ready_to_run %}
+        <div class="text-muted text-sm" style="margin-top:8px;">⚠️ Completa el wizard para habilitar este botón.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Pool Bulk -->
+    <div class="panel mb-16">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-icon">🗂</div>Pool Bulk (rápido)</div>
+      </div>
+      <div class="panel-body">
+        <p class="text-muted text-sm mb-16">Completa PoolTurnos sin tipear cientos de filas. Selecciona OU + Cargo, marca días y pega shift_ids.</p>
+        <form method="post" action="/ui/companies/{{ company.id }}/pool-bulk">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">OU</label>
+              <select name="org_unit_id" class="form-control" required>
+                {% for ou in all_org_units %}
+                <option value="{{ ou.id }}">{{ ou.org_unit_key }} — {{ ou.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cargo</label>
+              <input name="cargo_id" class="form-control" placeholder="Opcional (vacío = todos los cargos)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Días</label>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              {% for d in ["LUN","MAR","MIE","JUE","VIE","SAB","DOM"] %}
+              <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;">
+                <input type="checkbox" name="dias_semana" value="{{ d }}"> {{ d }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Shift IDs (uno por línea)</label>
+            <textarea name="shift_ids_text" rows="5" class="form-control" placeholder="S_0730_1500_60&#10;S_0830_1700_60" required></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Aplicar Pool</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Carga masiva -->
+    <div class="panel mb-16">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-icon">📥</div>Carga masiva (onboarding)</div>
+      </div>
+      <div class="panel-body">
+        <p class="text-muted text-sm mb-16">Descarga la plantilla, llénala y súbela para evitar digitación manual.</p>
+        <a href="/ui/companies/{{ company.id }}/case-data-template" class="btn btn-ghost btn-sm mb-16">📊 Descargar template (case_data_template.xlsx)</a>
+        <div class="divider"></div>
+        <form method="post" action="/ui/companies/{{ company.id }}/case-data-import" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:flex-end;margin-top:12px;">
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <label class="form-label">Subir carga masiva (.xlsx)</label>
+            <input type="file" name="file" accept=".xlsx" required class="form-control">
+          </div>
+          <button type="submit" class="btn btn-primary">Importar</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Columna derecha: Sucursales -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-icon">📍</div>Sucursales</div>
+      </div>
+      <div class="panel-body">
+        <form method="post" action="/ui/companies/{{ company.id }}/branches" style="margin-bottom:16px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Código <span class="required">*</span></label>
+              <input name="code" class="form-control" placeholder="Ej: 0001" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombre <span class="required">*</span></label>
+              <input name="name" class="form-control" placeholder="Ej: Sucursal Centro" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">+ Crear sucursal</button>
+        </form>
+        <div class="divider"></div>
+        {% if branches %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead><tr><th>Código</th><th>Nombre</th><th class="td-actions">Acciones</th></tr></thead>
+            <tbody>
+              {% for b in branches %}
+              <tr>
+                <td class="td-mono">{{ b.code }}</td>
+                <td class="td-name">{{ b.name }}</td>
+                <td class="td-actions"><a href="/ui/branches/{{ b.id }}" class="btn btn-ghost btn-sm">Abrir →</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted text-sm" style="margin-top:10px;">Entra a una sucursal → crea OUs → carga empleados/demanda/pool.</div>
+        {% else %}
+        <div class="empty-state" style="padding:24px 0;">
+          <div class="empty-icon">📍</div>
+          <div class="empty-title">Sin sucursales</div>
+          <div class="empty-desc">Crea la primera sucursal para comenzar.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>.mb-16{margin-bottom:16px;}</style>
+{% endblock %}

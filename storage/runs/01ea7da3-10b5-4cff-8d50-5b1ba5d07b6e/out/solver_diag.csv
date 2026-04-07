@@ -1,0 +1,7 @@
+﻿etapa,status,objective
+1_demanda,FEASIBLE,10431911000112.0
+2a_contrato_short,FEASIBLE,0.0
+2b_contrato_min,SKIPPED,
+2c_turnos_cortos,UNKNOWN,
+3_resto,FEASIBLE,-104285560.0
+usada,etapa3_final,

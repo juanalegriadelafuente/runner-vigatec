@@ -1,0 +1,20 @@
+CERTIFICADO DE CALIDAD DEL PLAN (Turnera)
+
+Etapa usada: etapa3_final
+Status (etapa usada): N/A
+
+Métricas (menor es mejor, por orden de prioridad):
+2) Contrato: semanas-persona con déficit = 0
+   Contrato: minutos bajo contrato total = 0
+   Utilización vs contrato = 100.00% (planned/target)
+Expertise: % minutos cubiertos por ALTA (MAÑANA) = 100.00%
+Expertise: % minutos cubiertos por ALTA (NOCHE) = 100.00%
+
+Evidencia de búsqueda (objetivos reportados por etapa):
+- Última etapa de demanda objective = 13132783000141.0
+- Última etapa de contrato objective = 0.0
+
+Interpretación de optimalidad:
+- OPTIMAL: el solver probó que no existe una solución mejor con las mismas reglas.
+- FEASIBLE: es la mejor solución encontrada dentro del tiempo de búsqueda.
+- UNKNOWN: no se pudo concluir optimalidad; se entrega la mejor solución encontrada antes del corte.

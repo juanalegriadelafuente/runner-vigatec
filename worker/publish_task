@@ -1,0 +1,11 @@
+token = os.getenv("INTERNAL_API_TOKEN", "").strip()
+...
+req = urllib.request.Request(
+    url,
+    headers={
+        "Accept": "application/pdf",
+        "User-Agent": "turnera-worker/0.1",
+        "X-Internal-Token": token,
+    },
+    method="GET",
+)

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Vigatec Runner{% endblock %} — Turnos</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/runner.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+
+  <!-- Brand con logo Vigatec -->
+  <div class="sidebar-brand">
+    <div class="brand-logo">
+      <svg width="34" height="34" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" class="brand-icon">
+        <rect width="60" height="60" rx="10" fill="#0D2240"/>
+        <polygon points="10,14 30,46 50,14 42,14 30,36 18,14" fill="#0EA5E9"/>
+        <polygon points="22,14 30,28 38,14 30,22" fill="#10B981"/>
+      </svg>
+      <div class="brand-text">
+        <div class="brand-name">Vigatec</div>
+        <div class="brand-sub">Runner · Turnos</div>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Colapsar menú">
+        <svg id="icon-collapse" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="2.5" width="12" height="1.5" rx="0.75" fill="rgba(255,255,255,0.55)"/>
+          <rect x="1" y="6.25" width="12" height="1.5" rx="0.75" fill="rgba(255,255,255,0.55)"/>
+          <rect x="1" y="10"   width="12" height="1.5" rx="0.75" fill="rgba(255,255,255,0.55)"/>
+        </svg>
+        <svg id="icon-expand" width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:none">
+          <path d="M5 2.5 L9.5 7 L5 11.5" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Contexto activo -->
+    {% if active_company %}
+    <div class="context-bar">
+      <div class="context-row">
+        <span class="ctx-label">🏢</span>
+        <span class="ctx-value">{{ active_company.name | truncate(22, True) }}</span>
+      </div>
+      {% if active_branch %}
+      <div class="context-row">
+        <span class="ctx-label">📍</span>
+        <span class="ctx-value">{{ active_branch.name | truncate(22, True) }}</span>
+      </div>
+      {% endif %}
+      {% if active_ou %}
+      <div class="context-row">
+        <span class="ctx-label">🏬</span>
+        <span class="ctx-value">{{ active_ou.name | truncate(22, True) }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="context-bar context-empty">
+      <a href="{{ url_for('ui_companies') }}" class="ctx-choose">Elegir empresa →</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Navegación -->
+  <nav class="sidebar-nav">
+
+    <div class="nav-section">General</div>
+    {# Auto-detect active nav from URL path #}
+    {% set _path = request.url.path %}
+
+    <a href="{{ url_for('ui_home') }}"
+       class="nav-item {% if _path == '/ui/' or _path == '/ui/home' %}active{% endif %}">
+      <span class="nav-icon">⊞</span> Inicio
+    </a>
+
+    <div class="nav-section">Sistema</div>
+    <a href="{{ url_for('ui_users') }}"
+       class="nav-item {% if '/users' in _path %}active{% endif %}">
+      <span class="nav-icon">👤</span> Usuarios
+    </a>
+
+    <div class="nav-section">Configuración</div>
+    <a href="{{ url_for('ui_companies') }}"
+       class="nav-item {% if '/companies' in _path %}active{% endif %}">
+      <span class="nav-icon">🏢</span> Empresas
+    </a>
+
+    <div class="nav-section">Operación</div>
+    <a href="{{ url_for('ui_colaboradores') }}"
+       class="nav-item {% if '/colaboradores' in _path %}active{% endif %}">
+      <span class="nav-icon">👥</span> Colaboradores
+    </a>
+    <a href="{{ url_for('ui_demanda') }}"
+       class="nav-item {% if '/demanda' in _path %}active{% endif %}">
+      <span class="nav-icon">📈</span> Demanda
+    </a>
+    <a href="{{ url_for('ui_pool') }}"
+       class="nav-item {% if _path == '/ui/pool' or _path.startswith('/ui/pool') %}active{% endif %}">
+      <span class="nav-icon">🗂</span> Pool
+    </a>
+    <a href="{{ url_for('ui_restricciones') }}"
+       class="nav-item {% if '/restricciones' in _path %}active{% endif %}">
+      <span class="nav-icon">⚠️</span> Restricciones
+    </a>
+    <a href="{{ url_for('ui_ausentismos') }}"
+       class="nav-item {% if '/ausentismos' in _path %}active{% endif %}">
+      <span class="nav-icon">🏥</span> Ausentismos
+    </a>
+
+    <div class="nav-section">Turnos</div>
+    <a href="{{ url_for('ui_turnos') }}"
+       class="nav-item {% if _path == '/ui/turnos' %}active{% endif %}">
+      <span class="nav-icon">🚀</span> Pedir Turnos
+    </a>
+    <a href="{{ url_for('ui_runs') }}"
+       class="nav-item {% if '/runs' in _path %}active{% endif %}">
+      <span class="nav-icon">▶</span> Runs
+    </a>
+    <a href="{{ url_for('ui_plan') }}"
+       class="nav-item {% if '/plan' in _path %}active{% endif %}">
+      <span class="nav-icon">📅</span> Visualizar / Editar
+    </a>
+    <a href="{{ url_for('ui_publish') }}"
+       class="nav-item {% if '/publish' in _path %}active{% endif %}">
+      <span class="nav-icon">📤</span> Publicar
+    </a>
+    <a href="{{ url_for('ui_exports') }}"
+       class="nav-item {% if '/exports' in _path %}active{% endif %}">
+      <span class="nav-icon">📥</span> Exportar
+    </a>
+
+  </nav>
+
+  <!-- Footer usuario -->
+  <div class="sidebar-footer">
+    <div class="avatar">
+      {% if current_user %}{{ current_user.full_name[:2].upper() }}{% else %}??{% endif %}
+    </div>
+    <div class="footer-info">
+      <div class="footer-name">{{ current_user.email if current_user else "Sin sesión" }}</div>
+      <div class="footer-role">{{ current_user.role | title if current_user else "" }}</div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+      {% block page_subtitle %}{% endblock %}
+    </div>
+    <div class="topbar-right">
+      <!-- Notificaciones -->
+      <div class="notif-btn" title="Alertas">
+        🔔
+        {% if alerts_count and alerts_count > 0 %}
+          <span class="notif-badge"></span>
+        {% endif %}
+      </div>
+      {% block topbar_actions %}{% endblock %}
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+
+</div><!-- /main -->
+
+<!-- Estilos extra para page_title y nav mejorado -->
+<style>
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.page-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* Nav activa mejorada */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin: 1px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  transition: all 0.12s;
+  position: relative;
+}
+.nav-item:hover {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.9);
+}
+.nav-item.active {
+  background: rgba(14,165,233,0.18);
+  color: #7DD3FC;
+  font-weight: 600;
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+  margin-left: -8px;
+}
+.nav-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.nav-section {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 24px 4px;
+}
+
+/* Brand logo */
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 12px;
+}
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.3px;
+}
+.brand-sub {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 1px;
+}
+
+/* Context bar */
+.context-bar {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 0;
+}
+.context-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.ctx-label { font-size: 12px; flex-shrink: 0; }
+.ctx-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.context-empty { text-align: center; }
+.ctx-choose {
+  font-size: 12px;
+  color: #7DD3FC;
+  text-decoration: none;
+  font-weight: 500;
+}
+.ctx-choose:hover { color: #38BDF8; }
+
+/* Avatar footer */
+.avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+
+/* Topbar */
+.topbar { padding: 14px 28px; }
+.topbar-right { gap: 10px; }
+
+/* Shared component styles (available to all pages) */
+.alert-msg { display:flex; align-items:center; gap:8px; padding:10px 16px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; margin-bottom:14px; }
+.alert-ok   { background:var(--green-soft); color:#065F46; border:1px solid #A7F3D0; }
+.alert-warn { background:var(--amber-soft);  color:#92400E; border:1px solid #FDE68A; }
+.alert-err  { background:var(--red-soft);    color:#991B1B; border:1px solid #FECACA; }
+
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); margin-bottom:16px; overflow:hidden; }
+.panel-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); }
+.panel-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--text); }
+.panel-title-icon { width:24px; height:24px; border-radius:6px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:13px; }
+.panel-body { padding:18px; }
+.panel-action { font-size:12.5px; font-weight:500; color:var(--accent); text-decoration:none; cursor:pointer; }
+.panel-action:hover { text-decoration:underline; }
+
+.table-wrapper { overflow-x:auto; }
+.table { width:100%; border-collapse:collapse; font-size:13px; }
+.table thead tr { background:#F8FAFC; }
+.table thead th { padding:10px 16px; font-size:11px; font-weight:700; color:var(--muted); text-align:left; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+.table tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+.table tbody tr:last-child { border-bottom:none; }
+.table tbody tr:hover { background:#F8FAFC; }
+.table tbody td { padding:11px 16px; vertical-align:middle; }
+.td-name { font-weight:600; color:var(--text); }
+.td-muted { font-size:12px; color:var(--muted); }
+.td-mono { font-family:'DM Mono',monospace; font-size:12px; color:var(--text); }
+.td-actions { text-align:right; white-space:nowrap; }
+
+.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-green  { background:#D1FAE5; color:#065F46; }
+.badge-amber  { background:#FEF3C7; color:#92400E; }
+.badge-red    { background:#FEE2E2; color:#991B1B; }
+.badge-blue   { background:#DBEAFE; color:#1D4ED8; }
+.badge-purple { background:#EDE9FE; color:#5B21B6; }
+.badge-gray   { background:#F3F4F6; color:#6B7280; }
+
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; cursor:pointer; border:none; text-decoration:none; transition:all .12s; font-family:'DM Sans',sans-serif; }
+.btn-primary   { background:var(--accent); color:white; }
+.btn-primary:hover { background:#0284C7; }
+.btn-secondary { background:var(--navy); color:white; }
+.btn-secondary:hover { background:#163556; }
+.btn-ghost  { background:transparent; color:var(--text); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--bg); }
+.btn-danger { background:#FEE2E2; color:#991B1B; border:1px solid #FECACA; }
+.btn-danger:hover { background:#FECACA; }
+.btn-sm { padding:5px 10px; font-size:12px; }
+
+.form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.form-label { font-size:12.5px; font-weight:600; color:var(--text); }
+.form-control { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--text); background:var(--bg); font-family:'DM Sans',sans-serif; outline:none; width:100%; }
+.form-control:focus { border-color:var(--accent); background:white; box-shadow:0 0 0 3px rgba(14,165,233,.1); }
+.form-hint { font-size:11.5px; color:var(--muted); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.required { color:var(--red); }
+
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:1000; backdrop-filter:blur(2px); }
+.modal { background:var(--surface); border-radius:var(--radius); box-shadow:0 20px 60px rgba(0,0,0,.25); width:90%; max-width:480px; overflow:hidden; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border); }
+.modal-title { font-size:16px; font-weight:700; color:var(--text); }
+.modal-close { background:none; border:none; font-size:18px; color:var(--muted); cursor:pointer; padding:4px; border-radius:4px; }
+.modal-close:hover { background:var(--bg); }
+.modal-body { padding:20px; }
+.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border); background:var(--bg); }
+
+.empty-state { text-align:center; padding:48px 24px; }
+.empty-icon { font-size:40px; margin-bottom:12px; opacity:.4; display:block; }
+.empty-title { font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px; }
+.empty-desc { font-size:13px; color:var(--muted); margin-bottom:16px; }
+
+.divider { height:1px; background:var(--border); margin:16px 0; }
+.section-title { font-size:11.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.text-muted { color:var(--muted); }
+.text-sm { font-size:12px; }
+.font-medium { font-weight:600; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.grid-2-1 { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+.mb-20 { margin-bottom:20px; }
+
+/* ── SIDEBAR COLAPSABLE ── */
+.sidebar { transition: width 0.22s ease, min-width 0.22s ease; }
+.main    { transition: margin-left 0.22s ease; }
+
+.sidebar-toggle {
+  background: none; border: none; cursor: pointer;
+  padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-left: auto;
+  transition: background 0.12s;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.12); }
+
+/* Estado colapsado */
+body.sidebar-collapsed .sidebar { width: 56px !important; min-width: 56px !important; }
+body.sidebar-collapsed .brand-text,
+body.sidebar-collapsed .context-bar,
+body.sidebar-collapsed .nav-section,
+body.sidebar-collapsed .sidebar-footer .footer-info { display: none !important; }
+body.sidebar-collapsed .nav-item { justify-content: center; padding: 9px 0; margin: 1px 4px; }
+body.sidebar-collapsed .nav-item span:last-child { display: none; }
+body.sidebar-collapsed .nav-icon { width: auto; font-size: 16px; }
+body.sidebar-collapsed .brand-logo { justify-content: center; padding-bottom: 8px; }
+body.sidebar-collapsed .brand-icon { width: 28px; height: 28px; }
+body.sidebar-collapsed .sidebar-toggle { margin: 0 auto; }
+body.sidebar-collapsed #icon-expand  { display: block !important; }
+body.sidebar-collapsed #icon-collapse { display: none  !important; }
+body.sidebar-collapsed .sidebar-footer { justify-content: center; padding: 10px 0; }
+</style>
+
+<script>
+function toggleSidebar() {
+  var collapsed = document.body.classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('sb', collapsed ? '1' : '0'); } catch(e) {}
+}
+(function() {
+  try { if (localStorage.getItem('sb') === '1') document.body.classList.add('sidebar-collapsed'); } catch(e) {}
+})();
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Runs{% endblock %}
+{% block page_title %}Corridas (Runs){% endblock %}
+{% block page_subtitle %}Historial de runs del solver{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="document.getElementById('modal-new').style.display='flex'">▶ Nuevo run manual</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats rápidos -->
+{% set ok_runs    = runs | selectattr('status','eq','success') | list %}
+{% set fail_runs  = runs | selectattr('status','eq','failed')  | list %}
+{% set queue_runs = runs | selectattr('status','in',['queued','running']) | list %}
+
+<div class="kpi-grid mb-20" style="grid-template-columns:repeat(3,1fr);">
+  <div class="kpi-card green">
+    <div class="kpi-label">Exitosos</div>
+    <div class="kpi-value">{{ ok_runs | length }}</div>
+    <div class="kpi-sub">de {{ runs | length }} totales</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-label">En cola / Ejecutando</div>
+    <div class="kpi-value">{{ queue_runs | length }}</div>
+    <div class="kpi-sub">pendientes ahora</div>
+  </div>
+  <div class="kpi-card red">
+    <div class="kpi-label">Fallidos</div>
+    <div class="kpi-value">{{ fail_runs | length }}</div>
+    <div class="kpi-sub">requieren revisión</div>
+  </div>
+</div>
+
+<!-- Tabla de runs -->
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-title"><div class="panel-title-icon">▶</div>Últimos 50 runs</div>
+    <button class="btn btn-ghost btn-sm" onclick="location.reload()">↺ Refrescar</button>
+  </div>
+  {% if runs %}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Run ID</th>
+          <th>Archivo</th>
+          <th>Estado</th>
+          <th>Creado</th>
+          <th>Duración</th>
+          <th class="td-actions">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td class="td-mono" style="font-size:11px;">{{ r.id|string|truncate(16, True, '') }}</td>
+          <td>
+            <div class="td-name">{{ r.original_filename or 'case.xlsx' }}</div>
+          </td>
+          <td>
+            {% if r.status == 'success' %}
+              <span class="badge badge-green">✓ success</span>
+            {% elif r.status == 'failed' %}
+              <span class="badge badge-red">✕ failed</span>
+            {% elif r.status == 'running' %}
+              <span class="badge badge-blue">⟳ running</span>
+            {% else %}
+              <span class="badge badge-amber">⏳ {{ r.status }}</span>
+            {% endif %}
+          </td>
+          <td class="td-muted">{{ r.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+          <td class="td-mono">
+            {% if r.started_at and r.finished_at %}
+              {{ ((r.finished_at - r.started_at).total_seconds() | int) }}s
+            {% else %}—{% endif %}
+          </td>
+          <td class="td-actions">
+            <a href="{{ url_for('ui_run_detail', run_id=r.id) }}" class="btn btn-ghost btn-sm">Ver →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">▶</div>
+    <div class="empty-title">Sin runs</div>
+    <div class="empty-desc">Sube un archivo case.xlsx para generar el primer run.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal nuevo run -->
+<div id="modal-new" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nuevo run manual</div>
+      <button class="modal-close" onclick="document.getElementById('modal-new').style.display='none'">✕</button>
+    </div>
+    <form method="post" action="/runs" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="alert-msg" style="background:var(--amber-soft);color:#92400E;border:1px solid #FDE68A;margin-bottom:16px;font-size:12.5px;">
+          ⚠️ Esto crea un run manual. Normalmente usarás <strong>"Pedir turnos"</strong> desde la empresa.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Archivo case.xlsx <span class="required">*</span></label>
+          <input type="file" name="file" accept=".xlsx" class="form-control" required>
+          <div class="form-hint">Sube el archivo case.xlsx con la configuración del solver.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-new').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear Run</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if queue_runs %}
+<script>setTimeout(() => location.reload(), 8000);</script>
+{% endif %}
+
+{% endblock %}
